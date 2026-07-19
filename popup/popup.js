@@ -41,6 +41,29 @@
     });
   }
 
+  function toggleFavorite(listingId, listing) {
+    return new Promise((resolve) => {
+      chrome.storage.local.get({ [FAVORITES_KEY]: {} }, (result) => {
+        const favorites = result[FAVORITES_KEY] || {};
+
+        if (favorites[listingId]) {
+          delete favorites[listingId];
+        } else {
+          favorites[listingId] = {
+            id: listingId,
+            title: listing?.title || `Wellcee 房源 ${listingId}`,
+            url:
+              listing?.url ||
+              `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`,
+            createdAt: Date.now()
+          };
+        }
+
+        chrome.storage.local.set({ [FAVORITES_KEY]: favorites }, resolve);
+      });
+    });
+  }
+
   function createFavoriteItem(favorite, note) {
     const item = document.createElement("article");
     item.className = "favorite-item";
@@ -117,7 +140,23 @@
       window.close();
     });
 
-    item.appendChild(link);
+    const favoriteButton = document.createElement("button");
+    const isFavorite = Boolean(favorite);
+    favoriteButton.type = "button";
+    favoriteButton.className = "favorite-item__favorite-state";
+    favoriteButton.setAttribute("aria-pressed", String(isFavorite));
+    favoriteButton.setAttribute(
+      "aria-label",
+      isFavorite ? `取消收藏 ${title.textContent}` : `收藏 ${title.textContent}`
+    );
+    favoriteButton.title = isFavorite ? "取消收藏" : "收藏房源";
+    favoriteButton.addEventListener("click", async () => {
+      favoriteButton.disabled = true;
+      await toggleFavorite(listingId, listing);
+      await render();
+    });
+
+    item.append(link, favoriteButton);
     return item;
   }
 
