@@ -5,6 +5,10 @@
   const NOTES_KEY = "wellceeApartmentNotes";
   const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
   const WELLCEE_ORIGIN = "https://www.wellcee.com";
+  const BACKUP_FORMAT = "wellcee-notes-backup";
+  const BACKUP_SCHEMA_VERSION = 1;
+  const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+  const MAX_NOTE_LENGTH = 2000;
 
   const favoriteTab = document.getElementById("favorite-tab");
   const noteTab = document.getElementById("note-tab");
@@ -17,6 +21,12 @@
   const noteEmptyState = document.getElementById("note-empty-state");
   const favoriteCount = document.getElementById("favorite-count");
   const noteCount = document.getElementById("note-count");
+  const exportButton = document.getElementById("export-data");
+  const importButton = document.getElementById("import-data");
+  const importFile = document.getElementById("import-file");
+  const dataStatus = document.getElementById("data-status");
+
+  let statusTimer = null;
 
   function getStoredData() {
     return new Promise((resolve) => {
@@ -29,6 +39,235 @@
         (result) => resolve(result)
       );
     });
+  }
+
+  function setStoredData(value) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set(value, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
+
+  function isPlainRecord(value) {
+    return Object.prototype.toString.call(value) === "[object Object]";
+  }
+
+  function assertListingId(listingId, label) {
+    if (!/^\d+$/.test(listingId)) {
+      throw new Error(`${label}中包含无效房源 ID`);
+    }
+  }
+
+  function canonicalListingUrl(listingId, value, label) {
+    if (value !== undefined) {
+      if (typeof value !== "string") {
+        throw new Error(`${label}中的房源链接格式不正确`);
+      }
+
+      let url;
+      try {
+        url = new URL(value);
+      } catch {
+        throw new Error(`${label}中的房源链接格式不正确`);
+      }
+
+      if (
+        !["wellcee.com", "www.wellcee.com"].includes(url.hostname) ||
+        url.pathname.replace(/\/$/, "") !== `/rent-apartment/${listingId}`
+      ) {
+        throw new Error(`${label}中包含非 Wellcee 房源链接`);
+      }
+    }
+
+    return `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`;
+  }
+
+  function normalizedTitle(value, listingId, label) {
+    if (value === undefined || value === "") {
+      return `Wellcee 房源 ${listingId}`;
+    }
+    if (typeof value !== "string" || value.length > 500) {
+      throw new Error(`${label}中的房源标题格式不正确`);
+    }
+    return value.trim() || `Wellcee 房源 ${listingId}`;
+  }
+
+  function normalizedTimestamp(value, label) {
+    if (value === undefined) {
+      return Date.now();
+    }
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${label}中的时间格式不正确`);
+    }
+    return value;
+  }
+
+  function normalizeNotes(value) {
+    if (!isPlainRecord(value)) {
+      throw new Error("笔记数据格式不正确");
+    }
+
+    const normalized = {};
+    Object.entries(value).forEach(([listingId, note]) => {
+      assertListingId(listingId, "笔记数据");
+      if (typeof note !== "string" || note.length > MAX_NOTE_LENGTH) {
+        throw new Error(`房源 ${listingId} 的笔记格式不正确`);
+      }
+      if (note.trim()) {
+        normalized[listingId] = note;
+      }
+    });
+    return normalized;
+  }
+
+  function normalizeListingRecords(value, label, timestampKey) {
+    if (!isPlainRecord(value)) {
+      throw new Error(`${label}格式不正确`);
+    }
+
+    const normalized = {};
+    Object.entries(value).forEach(([listingId, listing]) => {
+      assertListingId(listingId, label);
+      if (!isPlainRecord(listing)) {
+        throw new Error(`${label}中的房源数据格式不正确`);
+      }
+      if (listing.id !== undefined && String(listing.id) !== listingId) {
+        throw new Error(`${label}中的房源 ID 不一致`);
+      }
+
+      normalized[listingId] = {
+        id: listingId,
+        title: normalizedTitle(listing.title, listingId, label),
+        url: canonicalListingUrl(listingId, listing.url, label),
+        [timestampKey]: normalizedTimestamp(listing[timestampKey], label)
+      };
+    });
+    return normalized;
+  }
+
+  function parseBackup(text) {
+    let backup;
+    try {
+      backup = JSON.parse(text);
+    } catch {
+      throw new Error("文件不是有效的 JSON");
+    }
+
+    if (
+      !isPlainRecord(backup) ||
+      backup.format !== BACKUP_FORMAT ||
+      backup.schemaVersion !== BACKUP_SCHEMA_VERSION ||
+      !isPlainRecord(backup.data)
+    ) {
+      throw new Error("不是有效的 Wellcee Notes 备份文件");
+    }
+
+    return {
+      notes: normalizeNotes(backup.data.notes),
+      noteDetails: normalizeListingRecords(
+        backup.data.noteDetails,
+        "笔记房源数据",
+        "updatedAt"
+      ),
+      favorites: normalizeListingRecords(
+        backup.data.favorites,
+        "收藏数据",
+        "createdAt"
+      )
+    };
+  }
+
+  function setDataStatus(message, state = "idle") {
+    window.clearTimeout(statusTimer);
+    dataStatus.textContent = message;
+    dataStatus.dataset.state = state;
+
+    if (state !== "idle") {
+      statusTimer = window.setTimeout(() => {
+        dataStatus.textContent = "收藏和笔记仅保存在当前 Chrome";
+        dataStatus.dataset.state = "idle";
+      }, 4000);
+    }
+  }
+
+  function setDataActionsBusy(isBusy) {
+    exportButton.disabled = isBusy;
+    importButton.disabled = isBusy;
+  }
+
+  async function exportData() {
+    setDataActionsBusy(true);
+    setDataStatus("正在生成备份…");
+
+    try {
+      const result = await getStoredData();
+      const notes = result[NOTES_KEY] || {};
+      const favorites = result[FAVORITES_KEY] || {};
+      const backup = {
+        format: BACKUP_FORMAT,
+        schemaVersion: BACKUP_SCHEMA_VERSION,
+        extensionVersion: chrome.runtime.getManifest().version,
+        exportedAt: new Date().toISOString(),
+        data: {
+          notes,
+          noteDetails: result[NOTE_DETAILS_KEY] || {},
+          favorites
+        }
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json"
+      });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `wellcee-notes-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setDataStatus(
+        `已导出 ${Object.keys(notes).length} 条笔记、${Object.keys(favorites).length} 条收藏`,
+        "success"
+      );
+    } catch (error) {
+      console.warn("[Wellcee Notes] 无法导出数据", error);
+      setDataStatus("导出失败，请重试", "error");
+    } finally {
+      setDataActionsBusy(false);
+    }
+  }
+
+  async function importData(file) {
+    if (file.size > MAX_IMPORT_BYTES) {
+      throw new Error("备份文件不能超过 5 MB");
+    }
+
+    const imported = parseBackup(await file.text());
+    const current = await getStoredData();
+    await setStoredData({
+      [NOTES_KEY]: {
+        ...(current[NOTES_KEY] || {}),
+        ...imported.notes
+      },
+      [NOTE_DETAILS_KEY]: {
+        ...(current[NOTE_DETAILS_KEY] || {}),
+        ...imported.noteDetails
+      },
+      [FAVORITES_KEY]: {
+        ...(current[FAVORITES_KEY] || {}),
+        ...imported.favorites
+      }
+    });
+
+    return {
+      noteCount: Object.keys(imported.notes).length,
+      favoriteCount: Object.keys(imported.favorites).length
+    };
   }
 
   function removeFavorite(listingId) {
@@ -217,6 +456,31 @@
 
   favoriteTab.addEventListener("click", () => selectView("favorites"));
   noteTab.addEventListener("click", () => selectView("notes"));
+  exportButton.addEventListener("click", exportData);
+  importButton.addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", async () => {
+    const file = importFile.files?.[0];
+    importFile.value = "";
+    if (!file) {
+      return;
+    }
+
+    setDataActionsBusy(true);
+    setDataStatus("正在导入备份…");
+    try {
+      const imported = await importData(file);
+      await render();
+      setDataStatus(
+        `已导入 ${imported.noteCount} 条笔记、${imported.favoriteCount} 条收藏`,
+        "success"
+      );
+    } catch (error) {
+      console.warn("[Wellcee Notes] 无法导入数据", error);
+      setDataStatus(error.message || "导入失败，请检查文件", "error");
+    } finally {
+      setDataActionsBusy(false);
+    }
+  });
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (

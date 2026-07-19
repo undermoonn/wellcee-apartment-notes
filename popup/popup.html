@@ -74,7 +74,21 @@
       </div>
     </main>
 
-    <footer>收藏和笔记仅保存在当前 Chrome</footer>
+    <footer class="data-footer">
+      <div class="data-actions">
+        <button id="export-data" class="data-action" type="button">导出数据</button>
+        <button id="import-data" class="data-action" type="button">导入数据</button>
+        <input
+          id="import-file"
+          type="file"
+          accept=".json,application/json"
+          hidden
+        >
+      </div>
+      <span id="data-status" class="data-status" role="status" aria-live="polite">
+        收藏和笔记仅保存在当前 Chrome
+      </span>
+    </footer>
     <script src="popup.js"></script>
   </body>
 </html>
