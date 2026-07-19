@@ -1,0 +1,313 @@
+.wellcee-note-anchor,
+.wellcee-favorite-anchor,
+a:has(> .wellcee-favorite-button--list) {
+  position: relative !important;
+}
+
+.wellcee-note-badge {
+  box-sizing: border-box !important;
+  position: absolute !important;
+  right: 56px !important;
+  bottom: 12px !important;
+  z-index: 12 !important;
+  display: block !important;
+  width: max-content !important;
+  height: 32px !important;
+  max-width: min(62%, 520px) !important;
+  overflow: hidden !important;
+  padding: 7px 10px 7px 28px !important;
+  border: 1px solid rgba(45, 181, 180, 0.34) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 253, 249, 0.97) !important;
+  box-shadow: 0 5px 16px rgba(22, 104, 103, 0.14) !important;
+  color: #263238 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  letter-spacing: 0 !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  pointer-events: none !important;
+}
+
+.wellcee-note-badge::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  background: #188c8b;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='M7 20V8.975q0-.825.6-1.4T9.025 7H20q.825 0 1.413.587T22 9v7.175q0 .4-.15.763t-.425.637l-3.85 3.85q-.275.275-.638.425t-.762.15H9q-.825 0-1.412-.587T7 20M2.025 6.25q-.15-.825.325-1.487t1.3-.813L14.5 2.025q.825-.15 1.488.325t.812 1.3L17.05 5H9Q7.35 5 6.175 6.175T5 9v9.55q-.4-.225-.687-.6t-.363-.85zM20 16h-3q-.425 0-.712.288T16 17v3z'/%3E%3C/svg%3E");
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='M7 20V8.975q0-.825.6-1.4T9.025 7H20q.825 0 1.413.587T22 9v7.175q0 .4-.15.763t-.425.637l-3.85 3.85q-.275.275-.638.425t-.762.15H9q-.825 0-1.412-.587T7 20M2.025 6.25q-.15-.825.325-1.487t1.3-.813L14.5 2.025q.825-.15 1.488.325t.812 1.3L17.05 5H9Q7.35 5 6.175 6.175T5 9v9.55q-.4-.225-.687-.6t-.363-.85zM20 16h-3q-.425 0-.712.288T16 17v3z'/%3E%3C/svg%3E");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.wellcee-favorite-button {
+  appearance: none !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgba(24, 140, 139, 0.22) !important;
+  border-radius: 8px !important;
+  outline: none !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 4px 14px rgba(32, 50, 49, 0.12) !important;
+  color: #188c8b !important;
+  cursor: pointer !important;
+  transition: background-color 140ms ease, border-color 140ms ease,
+    transform 140ms ease !important;
+}
+
+.wellcee-favorite-button::before {
+  content: "" !important;
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: currentColor !important;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='m7.625 6.4l2.8-3.625q.3-.4.713-.587T12 2t.863.188t.712.587l2.8 3.625l4.25 1.425q.65.2 1.025.738t.375 1.187q0 .3-.088.6t-.287.575l-2.75 3.9l.1 4.1q.025.875-.575 1.475t-1.4.6q-.05 0-.55-.075L12 19.675l-4.475 1.25q-.125.05-.275.063T6.975 21q-.8 0-1.4-.6T5 18.925l.1-4.125l-2.725-3.875q-.2-.275-.288-.575T2 9.75q0-.625.363-1.162t1.012-.763zM8.85 8.125L4 9.725L7.1 14.2L7 18.975l5-1.375l5 1.4l-.1-4.8L20 9.775l-4.85-1.65L12 4zM12 11.5'/%3E%3C/svg%3E") !important;
+  -webkit-mask-position: center !important;
+  -webkit-mask-repeat: no-repeat !important;
+  -webkit-mask-size: contain !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='m7.625 6.4l2.8-3.625q.3-.4.713-.587T12 2t.863.188t.712.587l2.8 3.625l4.25 1.425q.65.2 1.025.738t.375 1.187q0 .3-.088.6t-.287.575l-2.75 3.9l.1 4.1q.025.875-.575 1.475t-1.4.6q-.05 0-.55-.075L12 19.675l-4.475 1.25q-.125.05-.275.063T6.975 21q-.8 0-1.4-.6T5 18.925l.1-4.125l-2.725-3.875q-.2-.275-.288-.575T2 9.75q0-.625.363-1.162t1.012-.763zM8.85 8.125L4 9.725L7.1 14.2L7 18.975l5-1.375l5 1.4l-.1-4.8L20 9.775l-4.85-1.65L12 4zM12 11.5'/%3E%3C/svg%3E") !important;
+  mask-position: center !important;
+  mask-repeat: no-repeat !important;
+  mask-size: contain !important;
+}
+
+.wellcee-favorite-button[aria-pressed="true"] {
+  border-color: rgba(237, 106, 94, 0.28) !important;
+  background: #fff3ef !important;
+  color: #ed6a5e !important;
+}
+
+.wellcee-favorite-button[aria-pressed="true"]::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='m7.625 6.4l2.8-3.625q.3-.4.713-.587T12 2t.863.188t.712.587l2.8 3.625l4.25 1.425q.65.2 1.025.738t.375 1.187q0 .3-.088.6t-.287.575l-2.75 3.9l.1 4.1q.025.875-.575 1.475t-1.4.6q-.05 0-.55-.075L12 19.675l-4.475 1.25q-.125.05-.275.063T6.975 21q-.8 0-1.4-.6T5 18.925l.1-4.125l-2.725-3.875q-.2-.275-.288-.575T2 9.75q0-.625.363-1.162t1.012-.763z'/%3E%3C/svg%3E") !important;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'%3E%3Cpath fill='currentColor' d='m7.625 6.4l2.8-3.625q.3-.4.713-.587T12 2t.863.188t.712.587l2.8 3.625l4.25 1.425q.65.2 1.025.738t.375 1.187q0 .3-.088.6t-.287.575l-2.75 3.9l.1 4.1q.025.875-.575 1.475t-1.4.6q-.05 0-.55-.075L12 19.675l-4.475 1.25q-.125.05-.275.063T6.975 21q-.8 0-1.4-.6T5 18.925l.1-4.125l-2.725-3.875q-.2-.275-.288-.575T2 9.75q0-.625.363-1.162t1.012-.763z'/%3E%3C/svg%3E") !important;
+}
+
+.wellcee-favorite-button:hover {
+  border-color: #2db5b4 !important;
+  background: #f0fafa !important;
+  transform: translateY(-1px) !important;
+}
+
+.wellcee-favorite-button[aria-pressed="true"]:hover {
+  border-color: #ed6a5e !important;
+  background: #ffe9e3 !important;
+}
+
+.wellcee-favorite-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(45, 181, 180, 0.2) !important;
+}
+
+.wellcee-favorite-button:disabled {
+  cursor: wait !important;
+  opacity: 0.58 !important;
+}
+
+.wellcee-favorite-button--list {
+  position: absolute !important;
+  right: 14px !important;
+  bottom: 12px !important;
+  z-index: 14 !important;
+}
+
+.wellcee-note-editor,
+.wellcee-note-editor * {
+  box-sizing: border-box !important;
+}
+
+.wellcee-note-editor {
+  position: relative !important;
+  width: 100% !important;
+  margin: 26px 0 30px !important;
+  padding: 20px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(45, 181, 180, 0.28) !important;
+  border-radius: 14px !important;
+  background: #f6fbfa !important;
+  box-shadow: none !important;
+  color: #263238 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.wellcee-note-editor::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42px;
+  height: 42px;
+  background: #ff8b7d;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.wellcee-note-editor__header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  margin: 0 34px 14px 0 !important;
+}
+
+.wellcee-note-editor__actions {
+  display: flex !important;
+  flex: none !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.wellcee-favorite-button--detail {
+  position: static !important;
+  flex: none !important;
+  box-shadow: none !important;
+}
+
+.wellcee-note-editor__title-group {
+  display: block !important;
+}
+
+.wellcee-note-editor__eyebrow {
+  display: block !important;
+  margin: 0 0 3px !important;
+  color: #188c8b !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 14px !important;
+  letter-spacing: 0.12em !important;
+}
+
+.wellcee-note-editor__title {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #203231 !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 24px !important;
+}
+
+.wellcee-note-editor__status {
+  flex: none !important;
+  margin: 3px 0 0 !important;
+  color: #778382 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 18px !important;
+}
+
+.wellcee-note-editor__status[data-state="saving"] {
+  color: #188c8b !important;
+}
+
+.wellcee-note-editor__status[data-state="saved"]::before {
+  content: "✓";
+  margin-right: 5px;
+  color: #188c8b;
+}
+
+.wellcee-note-editor__status[data-state="error"] {
+  color: #c44336 !important;
+}
+
+.wellcee-note-editor__textarea {
+  display: block !important;
+  width: 100% !important;
+  min-height: 108px !important;
+  margin: 0 !important;
+  padding: 13px 14px !important;
+  resize: vertical !important;
+  border: 1px solid #d8e5e3 !important;
+  border-radius: 9px !important;
+  outline: none !important;
+  background: #fff !important;
+  box-shadow: inset 0 1px 2px rgba(32, 50, 49, 0.03) !important;
+  color: #263238 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 22px !important;
+  text-align: left !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease !important;
+}
+
+.wellcee-note-editor__textarea::placeholder {
+  color: #98a2a1 !important;
+  opacity: 1 !important;
+}
+
+.wellcee-note-editor__textarea:focus {
+  border-color: #2db5b4 !important;
+  box-shadow: 0 0 0 3px rgba(45, 181, 180, 0.13) !important;
+}
+
+.wellcee-note-editor__footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  margin-top: 9px !important;
+  color: #778382 !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+}
+
+.wellcee-note-editor__privacy {
+  min-width: 0 !important;
+}
+
+.wellcee-note-editor__count {
+  flex: none !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+@media (max-width: 760px) {
+  .wellcee-note-badge {
+    right: 52px !important;
+    bottom: 10px !important;
+    max-width: calc(100% - 68px) !important;
+  }
+
+  .wellcee-note-editor {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .wellcee-note-editor__header {
+    display: block !important;
+  }
+
+  .wellcee-note-editor__actions {
+    justify-content: space-between !important;
+    margin-top: 8px !important;
+  }
+
+  .wellcee-note-editor__status {
+    display: block !important;
+    margin-top: 4px !important;
+  }
+
+  .wellcee-note-editor__footer {
+    align-items: flex-start !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wellcee-note-editor__textarea {
+    transition: none !important;
+  }
+}

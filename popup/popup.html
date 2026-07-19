@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的 Wellcee 房源</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <span class="eyebrow">WELLCEE NOTES</span>
+        <h1>我的房源</h1>
+      </div>
+    </header>
+
+    <nav class="view-tabs" role="tablist" aria-label="房源列表">
+      <button
+        id="favorite-tab"
+        class="view-tab is-active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="favorite-panel"
+      >
+        收藏
+        <span id="favorite-count" class="view-tab__count" aria-hidden="true">0</span>
+      </button>
+      <button
+        id="note-tab"
+        class="view-tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="note-panel"
+      >
+        有笔记
+        <span id="note-count" class="view-tab__count" aria-hidden="true">0</span>
+      </button>
+    </nav>
+
+    <main>
+      <div id="view-track" class="view-track" data-view="favorites">
+        <section
+          id="favorite-panel"
+          class="view-panel"
+          role="tabpanel"
+          aria-labelledby="favorite-tab"
+          aria-hidden="false"
+        >
+          <div id="favorite-empty-state" class="empty-state" hidden>
+            <span class="empty-state__icon empty-state__icon--favorite" aria-hidden="true"></span>
+            <strong>还没有收藏房源</strong>
+            <p>在 Wellcee 列表或详情页点击星标，房源链接就会出现在这里。</p>
+          </div>
+          <div id="favorite-list" class="listing-list" aria-live="polite"></div>
+        </section>
+
+        <section
+          id="note-panel"
+          class="view-panel"
+          role="tabpanel"
+          aria-labelledby="note-tab"
+          aria-hidden="true"
+          inert
+        >
+          <div id="note-empty-state" class="empty-state" hidden>
+            <span class="empty-state__icon empty-state__icon--note" aria-hidden="true"></span>
+            <strong>还没有房源笔记</strong>
+            <p>在 Wellcee 房源详情页输入笔记后，对应房源会出现在这里。</p>
+          </div>
+          <div id="note-list" class="listing-list" aria-live="polite"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer>收藏和笔记仅保存在当前 Chrome</footer>
+    <script src="popup.js"></script>
+  </body>
+</html>
