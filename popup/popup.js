@@ -5,6 +5,7 @@
   const NOTES_KEY = "wellceeApartmentNotes";
   const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
   const RATINGS_KEY = "wellceeApartmentRatings";
+  const OPEN_IN_NEW_TAB_KEY = "wellceeOpenListingsInNewTab";
   const WELLCEE_ORIGIN = "https://www.wellcee.com";
   const BACKUP_FORMAT = "wellcee-notes-backup";
   const BACKUP_SCHEMA_VERSION = 2;
@@ -26,6 +27,9 @@
   const noteCount = document.getElementById("note-count");
   const sortDefaultButton = document.getElementById("sort-default");
   const sortRatingButton = document.getElementById("sort-rating");
+  const openInNewTabToggle = document.getElementById("open-in-new-tab");
+  const openCurrentLabel = document.getElementById("open-current-label");
+  const openNewTabLabel = document.getElementById("open-new-tab-label");
   const openSidePanelButton = document.getElementById("open-side-panel");
   const exportButton = document.getElementById("export-data");
   const importButton = document.getElementById("import-data");
@@ -38,6 +42,7 @@
   let activeListingRequest = 0;
   let hasRendered = false;
   let sortMode = "default";
+  let openInNewTab = true;
   const isPopupSurface = document.body.dataset.surface === "popup";
 
   async function refreshActiveListing() {
@@ -85,7 +90,18 @@
   async function openListing(url) {
     let opened = false;
     try {
-      await chrome.tabs.create({ url });
+      if (openInNewTab) {
+        await chrome.tabs.create({ url });
+      } else {
+        const [activeTab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true
+        });
+        if (activeTab?.id === undefined) {
+          throw new Error("无法获取当前标签页");
+        }
+        await chrome.tabs.update(activeTab.id, { url });
+      }
       opened = true;
     } catch (error) {
       console.warn("[Wellcee Notes] 无法打开房源", error);
@@ -104,7 +120,8 @@
           [FAVORITES_KEY]: {},
           [NOTES_KEY]: {},
           [NOTE_DETAILS_KEY]: {},
-          [RATINGS_KEY]: {}
+          [RATINGS_KEY]: {},
+          [OPEN_IN_NEW_TAB_KEY]: true
         },
         (result) => resolve(result)
       );
@@ -121,6 +138,12 @@
         resolve();
       });
     });
+  }
+
+  function syncOpenModeControl() {
+    openInNewTabToggle.checked = openInNewTab;
+    openCurrentLabel.classList.toggle("is-active", !openInNewTab);
+    openNewTabLabel.classList.toggle("is-active", openInNewTab);
   }
 
   function isPlainRecord(value) {
@@ -427,7 +450,7 @@
     item.classList.toggle("favorite-item--current", isCurrent);
     const status = document.createElement("span");
     status.className = "favorite-item__current";
-    status.textContent = "当前标签";
+    status.textContent = "当前浏览";
     status.setAttribute("aria-hidden", String(!isCurrent));
     link.appendChild(status);
   }
@@ -589,6 +612,8 @@
 
   async function render() {
     const result = await getStoredData();
+    openInNewTab = result[OPEN_IN_NEW_TAB_KEY] !== false;
+    syncOpenModeControl();
     const ratings = result[RATINGS_KEY] || {};
     const defaultFavoriteOrder = (left, right) =>
       (right.createdAt || 0) - (left.createdAt || 0);
@@ -649,6 +674,22 @@
   noteTab.addEventListener("click", () => selectView("notes"));
   sortDefaultButton.addEventListener("click", () => selectSortMode("default"));
   sortRatingButton.addEventListener("click", () => selectSortMode("rating"));
+  openInNewTabToggle.addEventListener("change", async () => {
+    const previousMode = openInNewTab;
+    openInNewTab = openInNewTabToggle.checked;
+    syncOpenModeControl();
+    openInNewTabToggle.disabled = true;
+    try {
+      await setStoredData({ [OPEN_IN_NEW_TAB_KEY]: openInNewTab });
+    } catch (error) {
+      console.warn("[Wellcee Notes] 无法保存打开方式", error);
+      openInNewTab = previousMode;
+      syncOpenModeControl();
+      setDataStatus("无法保存打开方式，请重试", "error");
+    } finally {
+      openInNewTabToggle.disabled = false;
+    }
+  });
   openSidePanelButton?.addEventListener("click", async () => {
     openSidePanelButton.disabled = true;
     try {
@@ -691,6 +732,11 @@
   });
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && changes[OPEN_IN_NEW_TAB_KEY]) {
+      openInNewTab = changes[OPEN_IN_NEW_TAB_KEY].newValue !== false;
+      syncOpenModeControl();
+    }
+
     if (
       areaName === "local" &&
       (changes[FAVORITES_KEY] ||

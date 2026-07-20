@@ -133,11 +133,18 @@ h1 {
   display: flex;
   flex: none;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 7px 14px;
   border-bottom: 1px solid #e8eeec;
   background: #fff;
+}
+
+.sort-bar__group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
 }
 
 .sort-bar__label {
@@ -298,7 +305,7 @@ main {
 .favorite-item--current .favorite-item__current {
   min-height: 18px;
   height: 18px;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
   padding: 1px 7px;
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -517,6 +524,87 @@ main {
   text-align: center;
 }
 
+.open-mode {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.open-mode__choice {
+  color: #9aa3a1;
+  font-size: 10px;
+  line-height: 20px;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.open-mode__choice.is-active {
+  color: #157f7e;
+  font-weight: 700;
+}
+
+.open-mode__switch {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.open-mode__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.open-mode__track {
+  display: block;
+  width: 36px;
+  height: 20px;
+  border: 1px solid #cbd8d6;
+  border-radius: 999px;
+  background: #edf2f1;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.open-mode__track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(32, 50, 49, 0.22);
+  transition: transform 180ms cubic-bezier(0.22, 0.8, 0.32, 1);
+}
+
+.open-mode__input:checked + .open-mode__track {
+  border-color: #188c8b;
+  background: #188c8b;
+}
+
+.open-mode__input:checked + .open-mode__track::after {
+  transform: translateX(16px);
+}
+
+.open-mode__input:focus-visible + .open-mode__track {
+  outline: 2px solid #2db5b4;
+  outline-offset: 2px;
+}
+
+.open-mode__input:disabled + .open-mode__track {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .data-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -570,7 +658,10 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .view-track,
   .favorite-item,
-  .favorite-item__current {
+  .favorite-item__current,
+  .open-mode__choice,
+  .open-mode__track,
+  .open-mode__track::after {
     transition: none;
   }
 }

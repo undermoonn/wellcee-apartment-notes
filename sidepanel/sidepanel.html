@@ -41,21 +41,38 @@
       </button>
     </nav>
 
-    <div class="sort-bar" aria-label="列表排序">
-      <span class="sort-bar__label">排序</span>
-      <div class="sort-toggle" role="group" aria-label="选择排序方式">
-        <button
-          id="sort-default"
-          class="sort-toggle__button is-active"
-          type="button"
-          aria-pressed="true"
-        >默认</button>
-        <button
-          id="sort-rating"
-          class="sort-toggle__button"
-          type="button"
-          aria-pressed="false"
-        >评分</button>
+    <div class="sort-bar" aria-label="列表设置">
+      <div class="open-mode" aria-label="房源打开方式">
+        <span id="open-current-label" class="open-mode__choice">当前页面</span>
+        <label class="open-mode__switch">
+          <input
+            id="open-in-new-tab"
+            class="open-mode__input"
+            type="checkbox"
+            role="switch"
+            aria-label="使用新标签页打开房源"
+            checked
+          >
+          <span class="open-mode__track" aria-hidden="true"></span>
+        </label>
+        <span id="open-new-tab-label" class="open-mode__choice is-active">新标签页</span>
+      </div>
+      <div class="sort-bar__group">
+        <span class="sort-bar__label">排序</span>
+        <div class="sort-toggle" role="group" aria-label="选择排序方式">
+          <button
+            id="sort-default"
+            class="sort-toggle__button is-active"
+            type="button"
+            aria-pressed="true"
+          >默认</button>
+          <button
+            id="sort-rating"
+            class="sort-toggle__button"
+            type="button"
+            aria-pressed="false"
+          >评分</button>
+        </div>
       </div>
     </div>
 
@@ -71,7 +88,7 @@
           <div id="favorite-empty-state" class="empty-state" hidden>
             <span class="empty-state__icon empty-state__icon--favorite" aria-hidden="true"></span>
             <strong>还没有收藏房源</strong>
-            <p>在 Wellcee 列表或详情页点击星标，房源链接就会出现在这里。</p>
+            <p>在 Wellcee 列表或详情页点击收藏按钮，房源链接就会出现在这里。</p>
           </div>
           <div id="favorite-list" class="listing-list" aria-live="polite"></div>
         </section>
