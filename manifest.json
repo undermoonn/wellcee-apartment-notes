@@ -7,6 +7,9 @@
     "storage",
     "sidePanel"
   ],
+  "host_permissions": [
+    "https://api.github.com/*"
+  ],
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",

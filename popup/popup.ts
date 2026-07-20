@@ -22,6 +22,13 @@ import {
   getStoredData,
   setStoredData
 } from "../src/storage.js";
+import {
+  checkForUpdates,
+  createCheckingUpdateState,
+  createInitialUpdateState,
+  createUpdateErrorState
+} from "./update-check.js";
+import type { UpdateCheckState } from "./update-check.js";
 import { appTemplate } from "./view.js";
 import type {
   DataStatus,
@@ -51,6 +58,7 @@ let activeTabId: number | null = null;
 let activeListingId: ListingId | null = null;
 let activeListingRequest = 0;
 let dataRequest = 0;
+let updateRequest = 0;
 let viewMode: ViewMode = "favorites";
 let sortMode: SortMode = "default";
 let openInNewTab = true;
@@ -59,6 +67,7 @@ let sidePanelBusy = false;
 let dataActionsBusy = false;
 let storedData: WellceeStorageData = createStorageDefaults();
 let dataStatus: DataStatus = { message: IDLE_STATUS, state: "idle" };
+let updateCheck: UpdateCheckState = createInitialUpdateState();
 const busyListings = new Set<ListingId>();
 
 async function refreshData(): Promise<void> {
@@ -129,6 +138,38 @@ async function openListing(url: string): Promise<void> {
     if (opened && isPopupSurface) {
       window.close();
     }
+  }
+}
+
+async function refreshUpdateCheck(force = false): Promise<void> {
+  const request = ++updateRequest;
+  updateCheck = createCheckingUpdateState();
+  renderApp();
+  try {
+    const result = await checkForUpdates(force);
+    if (request === updateRequest) {
+      updateCheck = result;
+    }
+  } catch (error) {
+    console.warn("[Wellcee Notes] 无法检查更新", error);
+    if (request === updateRequest) {
+      updateCheck = createUpdateErrorState();
+    }
+  }
+  if (request === updateRequest) {
+    renderApp();
+  }
+}
+
+async function openRelease(url: string): Promise<void> {
+  try {
+    await chrome.tabs.create({ url });
+    if (isPopupSurface) {
+      window.close();
+    }
+  } catch (error) {
+    console.warn("[Wellcee Notes] 无法打开 Release 页面", error);
+    setDataStatus("无法打开更新页面，请重试", "error");
   }
 }
 
@@ -367,7 +408,9 @@ const viewActions: PopupViewActions = {
   exportData: () => void exportData(),
   handleImport: (event) => void handleImport(event),
   openListing: (url) => void openListing(url),
+  openRelease: (url) => void openRelease(url),
   openSidePanel: () => void openSidePanel(),
+  refreshUpdateCheck: () => void refreshUpdateCheck(true),
   removeFavorite: (listingId) =>
     void runListingAction(listingId, () => removeFavorite(listingId)),
   selectSortMode,
@@ -390,6 +433,7 @@ function renderApp(): void {
         sidePanelBusy,
         sortMode,
         storedData,
+        updateCheck,
         viewMode
       },
       viewActions
@@ -439,3 +483,4 @@ refreshData().catch((error) => {
   setDataStatus("无法读取本地数据，请重试", "error");
 });
 refreshActiveListing();
+void refreshUpdateCheck();

@@ -38,6 +38,22 @@ body {
   background: #fff;
 }
 
+.header__title,
+.header__actions {
+  min-width: 0;
+}
+
+.header__title {
+  flex: none;
+}
+
+.header__actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .eyebrow {
   display: block;
   margin-bottom: 2px;
@@ -55,16 +71,20 @@ h1 {
 }
 
 .open-side-panel {
+  display: flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
-  padding: 7px 13px;
-  border: 1px solid rgba(24, 140, 139, 0.28);
-  border-radius: 8px;
-  background: #f0fafa;
+  padding: 5px 13px;
+  border: 1px solid #d8e5e3;
+  border-radius: 9px;
+  background: #f7fafa;
   color: #157f7e;
   font: inherit;
   font-size: 11px;
   font-weight: 700;
+  line-height: 16px;
   cursor: pointer;
 }
 
@@ -530,6 +550,94 @@ main {
   color: #899391;
   font-size: 10px;
   text-align: center;
+}
+
+.update-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid #e1e8e6;
+  border-radius: 9px;
+  background: #f7fafa;
+  text-align: left;
+}
+
+.update-check__summary {
+  display: grid;
+  grid-template-areas:
+    "label version"
+    "message message";
+  grid-template-columns: auto auto;
+  min-width: 0;
+  align-items: baseline;
+  column-gap: 5px;
+  row-gap: 1px;
+}
+
+.update-check__label {
+  grid-area: label;
+  color: #60706e;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.update-check__version {
+  grid-area: version;
+  color: #203231;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.update-check__message {
+  grid-area: message;
+  overflow: hidden;
+  color: #899391;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-check[data-state="available"] .update-check__message {
+  color: #157f7e;
+  font-weight: 650;
+}
+
+.update-check[data-state="error"] .update-check__message {
+  color: #c44336;
+}
+
+.update-check__action {
+  flex: none;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #d8e5e3;
+  border-radius: 7px;
+  background: #fff;
+  color: #60706e;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.update-check__action:hover,
+.update-check__action--available {
+  border-color: rgba(24, 140, 139, 0.4);
+  background: #f0fafa;
+  color: #157f7e;
+}
+
+.update-check__action:focus-visible {
+  outline: 2px solid #2db5b4;
+  outline-offset: 1px;
+}
+
+.update-check__action:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .open-mode {

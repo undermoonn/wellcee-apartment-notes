@@ -57,8 +57,11 @@ jobs:
         shell: bash
         run: |
           archive="wellcee-apartment-notes-${GITHUB_REF_NAME}.zip"
-          cd dist
-          zip -q -r "../${archive}" .
+          package_root="release/wellcee-apartment-notes"
+          mkdir -p "${package_root}"
+          cp -R dist/. "${package_root}/"
+          cd release
+          zip -q -r "../${archive}" wellcee-apartment-notes
           cd ..
           sha256sum "${archive}" > "${archive}.sha256"
           echo "archive=${archive}" >> "${GITHUB_OUTPUT}"

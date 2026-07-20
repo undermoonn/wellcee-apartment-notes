@@ -14,6 +14,7 @@ import type {
   NoteDetails,
   WellceeStorageData
 } from "../src/types.js";
+import type { UpdateCheckState } from "./update-check.js";
 
 export type DataStatusState = "idle" | "success" | "error";
 export type ViewMode = "favorites" | "notes";
@@ -35,6 +36,7 @@ export interface PopupViewState {
   sidePanelBusy: boolean;
   sortMode: SortMode;
   storedData: WellceeStorageData;
+  updateCheck: UpdateCheckState;
   viewMode: ViewMode;
 }
 
@@ -43,7 +45,9 @@ export interface PopupViewActions {
   exportData(): void;
   handleImport(event: Event): void;
   openListing(url: string): void;
+  openRelease(url: string): void;
   openSidePanel(): void;
+  refreshUpdateCheck(): void;
   removeFavorite(listingId: ListingId): void;
   selectSortMode(mode: SortMode): void;
   selectView(view: ViewMode): void;
@@ -254,21 +258,56 @@ export function appTemplate(
 
   return html`
     <header class="header">
-      <div>
+      <div class="header__title">
         <span class="eyebrow">WELLCEE NOTES</span>
         <h1>我的房源</h1>
       </div>
-      ${state.isPopupSurface
-        ? html`
-            <button
-              id="open-side-panel"
-              class="open-side-panel"
-              type="button"
-              ?disabled=${state.sidePanelBusy}
-              @click=${actions.openSidePanel}
-            >侧边栏</button>
-          `
-        : html`<p class="sidepanel-intro">收藏与私人笔记</p>`}
+      <div class="header__actions">
+        <div class="update-check" data-state=${state.updateCheck.status}>
+          <div class="update-check__summary">
+            <span class="update-check__label">当前版本</span>
+            <strong class="update-check__version">
+              v${state.updateCheck.currentVersion}
+            </strong>
+            <span class="update-check__message" role="status" aria-live="polite">
+              ${state.updateCheck.message}
+            </span>
+          </div>
+          ${state.updateCheck.status === "available" &&
+          state.updateCheck.releaseUrl
+            ? html`
+                <button
+                  class="update-check__action update-check__action--available"
+                  type="button"
+                  @click=${() =>
+                    actions.openRelease(state.updateCheck.releaseUrl || "")}
+                >更新 v${state.updateCheck.latestVersion}</button>
+              `
+            : html`
+                <button
+                  class="update-check__action"
+                  type="button"
+                  ?disabled=${state.updateCheck.status === "checking"}
+                  @click=${actions.refreshUpdateCheck}
+                >${state.updateCheck.status === "checking"
+                  ? "检查中"
+                  : state.updateCheck.status === "error"
+                    ? "重试"
+                    : "检查更新"}</button>
+              `}
+        </div>
+        ${state.isPopupSurface
+          ? html`
+              <button
+                id="open-side-panel"
+                class="open-side-panel"
+                type="button"
+                ?disabled=${state.sidePanelBusy}
+                @click=${actions.openSidePanel}
+              >侧边栏</button>
+            `
+          : nothing}
+      </div>
     </header>
 
     <nav class="view-tabs" role="tablist" aria-label="房源列表">

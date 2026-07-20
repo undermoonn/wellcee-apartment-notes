@@ -12,6 +12,7 @@ test("uses Manifest V3 and local storage", () => {
   assert.ok(manifest.permissions.includes("storage"));
   assert.ok(manifest.permissions.includes("sidePanel"));
   assert.ok(!manifest.permissions.includes("tabs"));
+  assert.deepEqual(manifest.host_permissions, ["https://api.github.com/*"]);
   assert.equal(manifest.action.default_popup, "popup/popup.html");
   assert.equal(manifest.side_panel.default_path, "sidepanel/sidepanel.html");
 });

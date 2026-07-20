@@ -16,12 +16,8 @@ body {
   padding: 18px 16px 12px;
 }
 
-.sidepanel-intro {
-  margin: 0;
-  color: #778382;
-  font-size: 10px;
-  line-height: 16px;
-  text-align: right;
+.header__actions {
+  gap: 6px;
 }
 
 .view-tabs {
@@ -49,12 +45,17 @@ body {
 }
 
 @media (max-width: 360px) {
-  .sidepanel-intro {
+  .header {
+    gap: 8px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .update-check__message {
     display: none;
   }
 
-  .header {
-    padding-right: 14px;
-    padding-left: 14px;
+  .update-check__summary {
+    grid-template-areas: "label version";
   }
 }
