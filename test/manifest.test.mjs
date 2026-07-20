@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const manifest = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8"));
+const projectManifestUrl = new URL("../manifest.json", import.meta.url);
+const distributionRootUrl = new URL("../dist/", import.meta.url);
+const distributionManifestUrl = new URL("manifest.json", distributionRootUrl);
+const manifest = JSON.parse(await readFile(projectManifestUrl, "utf8"));
 
 test("uses Manifest V3 and local storage", () => {
   assert.equal(manifest.manifest_version, 3);
@@ -21,18 +24,39 @@ test("runs only on Wellcee web pages", () => {
   ]);
 });
 
-test("all referenced extension assets exist", async () => {
-  const contentScript = manifest.content_scripts[0];
+test("dist is a self-contained loadable extension directory", async () => {
+  const distributedManifest = JSON.parse(
+    await readFile(distributionManifestUrl, "utf8")
+  );
+  assert.deepEqual(distributedManifest, manifest);
+
+  const contentScript = distributedManifest.content_scripts[0];
   const paths = [
-    ...Object.values(manifest.icons),
-    manifest.action.default_popup,
+    ...Object.values(distributedManifest.icons),
+    distributedManifest.action.default_popup,
     ...contentScript.js,
     ...contentScript.css,
-    "popup/popup.js",
+    "popup.js",
     "popup/popup.css",
-    manifest.side_panel.default_path,
+    distributedManifest.side_panel.default_path,
     "sidepanel/sidepanel.css"
   ];
 
-  await Promise.all(paths.map((path) => access(new URL(`../${path}`, import.meta.url))));
+  await Promise.all(paths.map((path) => access(new URL(path, distributionRootUrl))));
+
+  const extensionPages = [
+    new URL(distributedManifest.action.default_popup, distributionRootUrl),
+    new URL(distributedManifest.side_panel.default_path, distributionRootUrl)
+  ];
+  for (const pageUrl of extensionPages) {
+    const html = await readFile(pageUrl, "utf8");
+    for (const [, assetPath] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
+      const assetUrl = new URL(assetPath, pageUrl);
+      assert.ok(
+        assetUrl.href.startsWith(distributionRootUrl.href),
+        `${assetPath} must stay inside dist/`
+      );
+      await access(assetUrl);
+    }
+  }
 });

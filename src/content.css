@@ -1,7 +1,10 @@
 .wellcee-note-anchor,
-.wellcee-favorite-anchor,
-a:has(> .wellcee-favorite-button--list) {
+.wellcee-favorite-anchor {
   position: relative !important;
+}
+
+.wellcee-listing-decoration {
+  display: contents !important;
 }
 
 .wellcee-note-badge {

@@ -2,7 +2,7 @@
   <img src="assets/icons/icon-128.png" width="96" height="96" alt="Wellcee 房源笔记图标">
   <h1>Wellcee 房源笔记</h1>
   <p>在浏览 Wellcee 时记录私人笔记、收藏房源并添加评分。</p>
-  <p><strong>零构建 · 本地存储 · Chrome Manifest V3</strong></p>
+  <p><strong>TypeScript 7 · lit-html · Rolldown · Chrome Manifest V3</strong></p>
 </div>
 
 ## 为什么需要它
@@ -43,22 +43,29 @@ Skill 需要：
 
 ## 安装
 
-目前需要通过 Chrome 的开发者模式安装：
+目前通过 GitHub Release 分发，并使用 Chrome 开发者模式安装：
 
-1. 下载本项目，或克隆仓库：
+1. 打开仓库的 [Releases](https://github.com/undermoonn/wellcee-apartment-notes/releases)，下载最新版本的 `wellcee-apartment-notes-vX.Y.Z.zip`。不要下载 GitHub 自动生成的 Source code 压缩包。
+2. 解压下载的扩展包。
+3. 在 Chrome 地址栏打开 `chrome://extensions`。
+4. 开启右上角的「开发者模式」。
+5. 点击「加载已解压的扩展程序」，选择解压后包含 `manifest.json` 的目录。
+6. 刷新已经打开的 Wellcee 页面。
 
-   ```bash
-   git clone https://github.com/undermoonn/wellcee-apartment-notes.git
-   ```
+如需从源码构建，则克隆仓库后执行：
 
-2. 在 Chrome 地址栏打开 `chrome://extensions`。
-3. 开启右上角的「开发者模式」。
-4. 点击「加载已解压的扩展程序」，选择项目根目录 `wellcee-apartment-notes`。
-5. 刷新已经打开的 Wellcee 页面。
+```bash
+git clone https://github.com/undermoonn/wellcee-apartment-notes.git
+cd wellcee-apartment-notes
+pnpm install
+pnpm build
+```
+
+然后在 Chrome 中选择生成的 `dist/`，不要选择项目根目录。
 
 安装完成后，建议把扩展固定到 Chrome 工具栏，方便随时打开房源列表。
 
-> 更新本地代码后，需要先在 `chrome://extensions` 中重新加载扩展，再刷新 Wellcee 页面。
+> 更新本地代码后，先运行构建生成新的 `dist/`，再在 `chrome://extensions` 中重新加载扩展并刷新 Wellcee 页面。
 
 ## 使用方式
 
@@ -104,23 +111,59 @@ Skill 需要：
 
 ## 本地开发
 
-项目不需要打包或安装运行时依赖。修改 HTML、CSS 或 JavaScript 后，重新加载扩展即可验证。
-
-运行自动化检查需要 Node.js 18 或更高版本：
+`dist/` 是本地生成且不会提交到仓库的构建产物。首次加载扩展或修改源码后，需要先安装依赖并重新构建：
 
 ```bash
-npm test
+pnpm install
 ```
+
+弹窗、侧边栏和注入 Wellcee 的控件都使用 TypeScript 7 与 `lit-html` 开发，并由 Rolldown 打包为 Manifest V3 可直接执行的 IIFE。构建会先清理 `dist/`，再生成包含清单、页面、样式、图标和脚本的独立扩展目录。不要直接编辑 `dist/` 中的文件：
+
+```bash
+pnpm build
+```
+
+只运行 TypeScript 严格类型检查：
+
+```bash
+pnpm typecheck
+```
+
+运行完整自动化检查需要 Node.js 20.19 或更高版本；检查会先完成类型检查并重新构建产物：
+
+```bash
+pnpm test
+```
+
+## 发布
+
+CI 会在 `main` 分支的 push 和 pull request 上运行类型检查、构建及测试。发布版本时：
+
+1. 将 `package.json` 和 `manifest.json` 的版本同时更新为相同的三段版本号，例如 `1.2.3`。
+2. 确保版本提交已经合入并推送到 `main`。
+3. 在该提交上创建并推送对应标签：
+
+   ```bash
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+仅 `v<major>.<minor>.<patch>` 格式且指向 `main` 提交的标签可以发布。Release 工作流会重新测试项目、构建独立的 `dist/`、校验标签与两处版本号、生成 ZIP 和 SHA-256 校验文件，最后自动创建带生成式更新说明的 GitHub Release。
 
 项目结构：
 
 ```text
 .
 ├── manifest.json          # Chrome 扩展清单
-├── src/                   # 注入 Wellcee 页面的脚本与样式
-├── popup/                 # 工具栏弹窗
+├── src/                   # 注入 Wellcee 页面的源代码与样式
+├── popup/                 # 工具栏弹窗源代码与样式
 ├── sidepanel/             # Chrome 侧边栏
+├── dist/                  # 可直接“加载已解压”的完整扩展分发目录
 ├── assets/icons/          # 扩展图标
+├── scripts/               # 分发目录准备脚本
+├── .github/workflows/     # CI 与 GitHub Release 工作流
+├── rolldown.config.ts     # 内容脚本与扩展页面的打包配置
+├── tsconfig.json          # TypeScript 7 严格类型配置
 └── test/                  # Node.js 自动化检查
 ```
 
