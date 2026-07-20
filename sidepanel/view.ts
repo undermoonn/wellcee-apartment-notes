@@ -281,7 +281,6 @@ export function sidePanelTemplate(
       <div class="header__actions">
         <div class="update-check" data-state=${state.updateCheck.status}>
           <div class="update-check__summary">
-            <span class="update-check__label">当前版本</span>
             <strong class="update-check__version">
               v${state.updateCheck.currentVersion}
             </strong>

@@ -106,7 +106,7 @@ export function createInitialUpdateState(): UpdateCheckState {
   return {
     currentVersion,
     latestVersion: null,
-    message: "尚未检查更新",
+    message: "未检查",
     releaseUrl: null,
     status: "idle"
   };
@@ -117,7 +117,7 @@ export function createCheckingUpdateState(): UpdateCheckState {
   return {
     currentVersion,
     latestVersion: null,
-    message: "正在检查更新…",
+    message: "检查中…",
     releaseUrl: null,
     status: "checking"
   };
@@ -128,7 +128,7 @@ export function createUpdateErrorState(): UpdateCheckState {
   return {
     currentVersion,
     latestVersion: null,
-    message: "检查更新失败",
+    message: "检查失败",
     releaseUrl: null,
     status: "error"
   };
@@ -150,8 +150,8 @@ export async function checkForUpdates(
     currentVersion,
     latestVersion: latestRelease.latestVersion,
     message: updateAvailable
-      ? `发现新版本 v${latestRelease.latestVersion}`
-      : "已是最新版本",
+      ? `新版本 v${latestRelease.latestVersion}`
+      : "已是最新",
     releaseUrl: latestRelease.releaseUrl,
     status: updateAvailable ? "available" : "current"
   };

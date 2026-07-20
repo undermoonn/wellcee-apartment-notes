@@ -60,8 +60,4 @@ body {
   .update-check__message {
     display: none;
   }
-
-  .update-check__summary {
-    grid-template-areas: "label version";
-  }
 }
