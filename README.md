@@ -46,7 +46,7 @@ Skill 需要：
 
 目前通过 GitHub Release 分发，并使用 Chrome 开发者模式安装：
 
-1. 打开仓库的 [Releases](https://github.com/undermoonn/wellcee-apartment-notes/releases)，下载最新版本的 `wellcee-apartment-notes-vX.Y.Z.zip`。不要下载 GitHub 自动生成的 Source code 压缩包。
+1. 打开仓库的 [Releases](https://github.com/undermoonn/wellcee-apartment-notes/releases)，进入最新版本，在 **Assets** 中下载标记为 **Chrome extension package** 的 ZIP 附件。不要选择 GitHub 自动生成的 **Source code (zip)** 或 **Source code (tar.gz)**。
 2. 解压下载的扩展包；压缩包内的根目录固定为不带版本号的 `wellcee-apartment-notes/`。
 3. 在 Chrome 地址栏打开 `chrome://extensions`。
 4. 开启右上角的「开发者模式」。
