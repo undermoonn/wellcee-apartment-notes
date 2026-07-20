@@ -512,7 +512,12 @@ main {
 }
 
 .empty-state {
-  padding: 42px 28px 44px;
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
   color: #667370;
   text-align: center;
 }
