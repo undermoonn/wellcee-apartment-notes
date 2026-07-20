@@ -74,9 +74,11 @@
       activeTabId !== nextTabId || activeListingId !== nextListingId;
     activeTabId = nextTabId;
     activeListingId = nextListingId;
-    if (didChange || !hasRendered) {
+    if (!hasRendered) {
       hasRendered = true;
       await render();
+    } else if (didChange) {
+      syncCurrentListingStatuses();
     }
   }
 
@@ -420,15 +422,24 @@
   }
 
   function appendCurrentListingStatus(item, link, listingId) {
-    if (String(listingId) !== activeListingId) {
-      return;
-    }
-
-    item.classList.add("favorite-item--current");
+    const isCurrent = String(listingId) === activeListingId;
+    item.dataset.listingId = String(listingId);
+    item.classList.toggle("favorite-item--current", isCurrent);
     const status = document.createElement("span");
     status.className = "favorite-item__current";
     status.textContent = "当前标签";
+    status.setAttribute("aria-hidden", String(!isCurrent));
     link.appendChild(status);
+  }
+
+  function syncCurrentListingStatuses() {
+    document.querySelectorAll(".favorite-item[data-listing-id]").forEach((item) => {
+      const isCurrent = item.dataset.listingId === activeListingId;
+      item.classList.toggle("favorite-item--current", isCurrent);
+      item
+        .querySelector(".favorite-item__current")
+        ?.setAttribute("aria-hidden", String(!isCurrent));
+    });
   }
 
   function createRatingStatus(rating, isFavorite = true) {

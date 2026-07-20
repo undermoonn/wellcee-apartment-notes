@@ -221,6 +221,7 @@ main {
   min-height: 76px;
   border-bottom: 1px solid #edf1f0;
   background: #fff;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .favorite-item--current {
@@ -267,11 +268,14 @@ main {
 }
 
 .favorite-item__current {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-height: 18px;
-  margin-bottom: 5px;
-  padding: 1px 7px;
+  width: max-content;
+  min-height: 0;
+  height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  padding: 0 7px;
   border-radius: 999px;
   background: #188c8b;
   color: #fff;
@@ -279,6 +283,27 @@ main {
   font-weight: 750;
   line-height: 16px;
   letter-spacing: 0.03em;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.96);
+  visibility: hidden;
+  transition: height 220ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    min-height 220ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    margin-bottom 220ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    padding 220ms cubic-bezier(0.22, 0.8, 0.32, 1), opacity 140ms ease,
+    transform 220ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    visibility 0s linear 220ms;
+  will-change: height, opacity, transform;
+}
+
+.favorite-item--current .favorite-item__current {
+  min-height: 18px;
+  height: 18px;
+  margin-bottom: 5px;
+  padding: 1px 7px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .favorite-item__meta {
@@ -543,7 +568,9 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .view-track {
+  .view-track,
+  .favorite-item,
+  .favorite-item__current {
     transition: none;
   }
 }
