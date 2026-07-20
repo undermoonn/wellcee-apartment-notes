@@ -36,6 +36,8 @@ test("tag workflow publishes the built distribution through GitHub Release", asy
   assert.match(workflow, /cp -R dist\/\./);
   assert.match(workflow, /zip -q -r "\.\.\/\$\{archive\}" wellcee-apartment-notes/);
   assert.match(workflow, /gh release create/);
+  assert.match(workflow, /#Wellcee 房源笔记 Chrome 扩展安装包/);
+  assert.match(workflow, /#SHA-256 checksum/);
   assert.match(workflow, /\.sha256/);
 });
 

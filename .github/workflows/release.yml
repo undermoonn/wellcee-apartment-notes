@@ -73,7 +73,7 @@ jobs:
         shell: bash
         run: |
           gh release create "${GITHUB_REF_NAME}" \
-            "${RELEASE_ARCHIVE}#Chrome extension package" \
+            "${RELEASE_ARCHIVE}#Wellcee 房源笔记 Chrome 扩展安装包" \
             "${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
             --verify-tag \
             --generate-notes \
