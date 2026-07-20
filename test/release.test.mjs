@@ -41,12 +41,18 @@ test("tag workflow publishes the built distribution through GitHub Release", asy
   assert.match(workflow, /\.sha256/);
 });
 
-test("CI validates pushes and pull requests targeting main", async () => {
-  const workflow = await readProjectFile(".github/workflows/ci.yml");
+test("pre-commit hook runs typecheck and tests", async () => {
+  const [packageJson, hook, installer] = await Promise.all([
+    readProjectFile("package.json").then(JSON.parse),
+    readProjectFile(".githooks/pre-commit"),
+    readProjectFile("scripts/install-git-hooks.mjs")
+  ]);
 
-  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*- main/);
-  assert.match(workflow, /pull_request:/);
-  assert.match(workflow, /contents: read/);
-  assert.match(workflow, /pnpm install --frozen-lockfile/);
-  assert.match(workflow, /pnpm test/);
+  assert.equal(
+    packageJson.scripts.prepare,
+    "node scripts/install-git-hooks.mjs"
+  );
+  assert.match(hook, /^#!\/bin\/sh/);
+  assert.match(hook, /pnpm typecheck\s+pnpm test/);
+  assert.match(installer, /"core\.hooksPath", "\.githooks"/);
 });

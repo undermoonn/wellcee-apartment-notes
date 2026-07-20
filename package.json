@@ -6,6 +6,7 @@
   "description": "A TypeScript 7 and lit-html Chrome extension for private notes on Wellcee apartment listings.",
   "type": "module",
   "scripts": {
+    "prepare": "node scripts/install-git-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && node scripts/prepare-distribution.mjs && rolldown -c",
     "test": "tsc --noEmit && node scripts/prepare-distribution.mjs && rolldown -c && node --test"
