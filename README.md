@@ -69,6 +69,24 @@
 
 默认排序下，收藏按收藏时间、笔记按更新时间从新到旧排列。
 
+## Codex 房源筛选 Skill
+
+仓库内置了可分发的 [`browse-wellcee-listings`](.agents/skills/browse-wellcee-listings/SKILL.md) Skill。它会让 Codex 使用用户现有的 Chrome 会话，按照自然语言条件筛选和比较 Wellcee 房源，并按要求写入笔记、收藏和评分。
+
+在本仓库中使用 Codex 时可以直接调用：
+
+```text
+使用 $browse-wellcee-listings 帮我筛选上海静安区 8,000 元以内的一居室，收藏合适的房源，为它们写下优缺点并按匹配度打分。
+```
+
+Skill 需要：
+
+- Codex 的 Chrome 控制能力；
+- 已在 Chrome 中加载本扩展；
+- 可正常访问 Wellcee 的 Chrome 页面，无需登录。
+
+如需单独分发，将整个 `.agents/skills/browse-wellcee-listings` 目录复制到目标仓库的 `.agents/skills/`，或复制到用户级 Codex skills 目录。
+
 ## 数据、备份与隐私
 
 - 笔记、收藏、评分和打开方式偏好保存在 `chrome.storage.local`。
