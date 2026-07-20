@@ -31,7 +31,7 @@ a:has(> .wellcee-favorite-button--list) {
   text-decoration: none !important;
   white-space: nowrap !important;
   text-overflow: ellipsis !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
 }
 
 .wellcee-note-badge::before {
@@ -50,6 +50,17 @@ a:has(> .wellcee-favorite-button--list) {
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
+}
+
+.wellcee-note-badge:hover {
+  z-index: 30 !important;
+  min-height: 32px !important;
+  height: auto !important;
+  overflow: visible !important;
+  box-shadow: 0 8px 24px rgba(22, 104, 103, 0.2) !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  text-overflow: clip !important;
 }
 
 .wellcee-favorite-button {

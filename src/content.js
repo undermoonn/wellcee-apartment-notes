@@ -404,9 +404,11 @@
       if (badge.textContent !== note) {
         badge.textContent = note;
       }
-      if (badge.title !== note) {
-        badge.title = note;
+      const accessibleLabel = `我的房源笔记：${compactText(note)}`;
+      if (badge.getAttribute("aria-label") !== accessibleLabel) {
+        badge.setAttribute("aria-label", accessibleLabel);
       }
+      badge.removeAttribute("title");
     });
 
     document.querySelectorAll(`.${NOTE_ANCHOR_CLASS}`).forEach((anchor) => {
