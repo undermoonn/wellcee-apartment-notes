@@ -135,6 +135,8 @@ pnpm typecheck
 pnpm test
 ```
 
+源码按职责拆分：`src/constants.ts`、`src/storage.ts` 和 `src/types.ts` 提供共享基础设施；`src/content.ts` 与 `popup/popup.ts` 是两个状态编排入口；对应的 lit-html 模板分别位于 `src/content-view.ts` 和 `popup/view.ts`；备份文件校验集中在 `popup/backup.ts`，Wellcee URL 与页面 DOM 解析集中在 `src/wellcee-page.ts`。
+
 ## 发布
 
 CI 会在 `main` 分支的 push 和 pull request 上运行类型检查、构建及测试。发布版本时：

@@ -15,17 +15,20 @@ test("pins lit-html, TypeScript 7, and the current Rolldown release", async () =
 });
 
 test("extension pages use the bundled declarative UI", async () => {
-  const [popupHtml, sidepanelHtml, popupSource] = await Promise.all([
+  const [popupHtml, sidepanelHtml, popupSource, popupView] = await Promise.all([
     readProjectFile("dist/popup/popup.html"),
     readProjectFile("dist/sidepanel/sidepanel.html"),
-    readProjectFile("popup/popup.ts")
+    readProjectFile("popup/popup.ts"),
+    readProjectFile("popup/view.ts")
   ]);
 
   assert.match(popupHtml, /<div id="app"><\/div>/);
   assert.match(popupHtml, /src="\.\.\/popup\.js"/);
   assert.match(sidepanelHtml, /src="\.\.\/popup\.js"/);
   assert.match(popupSource, /from "lit-html"/);
-  assert.match(popupSource, /renderTemplate\(appTemplate\(\), appRoot\)/);
+  assert.match(popupSource, /from "\.\/view\.js"/);
+  assert.match(popupSource, /renderTemplate\(\s*appTemplate\(/);
+  assert.match(popupView, /export function appTemplate/);
 });
 
 test("Rolldown outputs self-contained classic scripts", async () => {

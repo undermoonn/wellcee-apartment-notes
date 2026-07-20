@@ -1,41 +1,42 @@
-import { html, nothing, render as renderTemplate } from "lit-html";
+import { render as renderTemplate } from "lit-html";
+import {
+  BACKUP_FORMAT,
+  BACKUP_SCHEMA_VERSION,
+  getErrorMessage,
+  isPlainRecord,
+  MAX_IMPORT_BYTES,
+  parseBackup
+} from "./backup.js";
+import {
+  ACTIVE_LISTING_REQUEST,
+  FAVORITES_KEY,
+  LISTING_CHANGED_MESSAGE,
+  NOTES_KEY,
+  NOTE_DETAILS_KEY,
+  OPEN_IN_NEW_TAB_KEY,
+  RATINGS_KEY,
+  WELLCEE_ORIGIN
+} from "../src/constants.js";
+import {
+  createStorageDefaults,
+  getStoredData,
+  setStoredData
+} from "../src/storage.js";
+import { appTemplate } from "./view.js";
 import type {
-  FavoriteListing,
-  Favorites,
-  ImportedBackupData,
+  DataStatus,
+  DataStatusState,
+  PopupViewActions,
+  SortMode,
+  ViewMode
+} from "./view.js";
+import type {
   ImportSummary,
   ListingId,
   ListingSummary,
-  NoteDetails,
-  Notes,
-  Ratings,
   WellceeStorageData
 } from "../src/types.js";
 
-type DataStatusState = "idle" | "success" | "error";
-type ViewMode = "favorites" | "notes";
-type SortMode = "default" | "rating";
-type TimestampKey = "createdAt" | "updatedAt";
-type TimestampedListing<Key extends TimestampKey> = ListingSummary &
-  Record<Key, number>;
-
-interface DataStatus {
-  message: string;
-  state: DataStatusState;
-}
-
-const FAVORITES_KEY = "wellceeApartmentFavorites";
-const NOTES_KEY = "wellceeApartmentNotes";
-const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
-const RATINGS_KEY = "wellceeApartmentRatings";
-const OPEN_IN_NEW_TAB_KEY = "wellceeOpenListingsInNewTab";
-const WELLCEE_ORIGIN = "https://www.wellcee.com";
-const BACKUP_FORMAT = "wellcee-notes-backup";
-const BACKUP_SCHEMA_VERSION = 2;
-const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
-const MAX_NOTE_LENGTH = 2000;
-const ACTIVE_LISTING_REQUEST = "wellcee:get-active-listing";
-const LISTING_CHANGED_MESSAGE = "wellcee:listing-changed";
 const IDLE_STATUS = "收藏和笔记仅保存在当前 Chrome";
 
 const appRootElement = document.getElementById("app");
@@ -56,42 +57,9 @@ let openInNewTab = true;
 let openModeBusy = false;
 let sidePanelBusy = false;
 let dataActionsBusy = false;
-let storedData: WellceeStorageData = {
-  [FAVORITES_KEY]: {},
-  [NOTES_KEY]: {},
-  [NOTE_DETAILS_KEY]: {},
-  [RATINGS_KEY]: {},
-  [OPEN_IN_NEW_TAB_KEY]: true
-};
+let storedData: WellceeStorageData = createStorageDefaults();
 let dataStatus: DataStatus = { message: IDLE_STATUS, state: "idle" };
 const busyListings = new Set<ListingId>();
-
-function getStoredData(): Promise<WellceeStorageData> {
-  return new Promise<WellceeStorageData>((resolve) => {
-    chrome.storage.local.get(
-      {
-        [FAVORITES_KEY]: {},
-        [NOTES_KEY]: {},
-        [NOTE_DETAILS_KEY]: {},
-        [RATINGS_KEY]: {},
-        [OPEN_IN_NEW_TAB_KEY]: true
-      },
-      (result) => resolve(result as unknown as WellceeStorageData)
-    );
-  });
-}
-
-function setStoredData(value: Partial<WellceeStorageData>): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    chrome.storage.local.set(value, () => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-        return;
-      }
-      resolve();
-    });
-  });
-}
 
 async function refreshData(): Promise<void> {
   const request = ++dataRequest;
@@ -162,185 +130,6 @@ async function openListing(url: string): Promise<void> {
       window.close();
     }
   }
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Object.prototype.toString.call(value) === "[object Object]";
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function assertListingId(listingId: string, label: string): void {
-  if (!/^\d+$/.test(listingId)) {
-    throw new Error(`${label}中包含无效房源 ID`);
-  }
-}
-
-function canonicalListingUrl(
-  listingId: ListingId,
-  value: unknown,
-  label: string
-): string {
-  if (value !== undefined) {
-    if (typeof value !== "string") {
-      throw new Error(`${label}中的房源链接格式不正确`);
-    }
-
-    let url;
-    try {
-      url = new URL(value);
-    } catch {
-      throw new Error(`${label}中的房源链接格式不正确`);
-    }
-
-    if (
-      !["wellcee.com", "www.wellcee.com"].includes(url.hostname) ||
-      url.pathname.replace(/\/$/, "") !== `/rent-apartment/${listingId}`
-    ) {
-      throw new Error(`${label}中包含非 Wellcee 房源链接`);
-    }
-  }
-
-  return `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`;
-}
-
-function normalizedTitle(
-  value: unknown,
-  listingId: ListingId,
-  label: string
-): string {
-  if (value === undefined || value === "") {
-    return `Wellcee 房源 ${listingId}`;
-  }
-  if (typeof value !== "string" || value.length > 500) {
-    throw new Error(`${label}中的房源标题格式不正确`);
-  }
-  return value.trim() || `Wellcee 房源 ${listingId}`;
-}
-
-function normalizedTimestamp(value: unknown, label: string): number {
-  if (value === undefined) {
-    return Date.now();
-  }
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    throw new Error(`${label}中的时间格式不正确`);
-  }
-  return value;
-}
-
-function normalizeNotes(value: unknown): Notes {
-  if (!isPlainRecord(value)) {
-    throw new Error("笔记数据格式不正确");
-  }
-
-  const normalized: Notes = {};
-  Object.entries(value).forEach(([listingId, note]) => {
-    assertListingId(listingId, "笔记数据");
-    if (typeof note !== "string" || note.length > MAX_NOTE_LENGTH) {
-      throw new Error(`房源 ${listingId} 的笔记格式不正确`);
-    }
-    if (note.trim()) {
-      normalized[listingId] = note;
-    }
-  });
-  return normalized;
-}
-
-function normalizeRatings(value: unknown): Ratings {
-  if (!isPlainRecord(value)) {
-    throw new Error("评分数据格式不正确");
-  }
-
-  const normalized: Ratings = {};
-  Object.entries(value).forEach(([listingId, rating]) => {
-    assertListingId(listingId, "评分数据");
-    if (
-      typeof rating !== "number" ||
-      !Number.isInteger(rating) ||
-      rating < 1 ||
-      rating > 5
-    ) {
-      throw new Error(`房源 ${listingId} 的评分必须是 1 到 5 星`);
-    }
-    normalized[listingId] = rating;
-  });
-  return normalized;
-}
-
-function normalizeListingRecords<Key extends TimestampKey>(
-  value: unknown,
-  label: string,
-  timestampKey: Key
-): Record<ListingId, TimestampedListing<Key>> {
-  if (!isPlainRecord(value)) {
-    throw new Error(`${label}格式不正确`);
-  }
-
-  const normalized: Record<ListingId, TimestampedListing<Key>> = {};
-  Object.entries(value).forEach(([listingId, listing]) => {
-    assertListingId(listingId, label);
-    if (!isPlainRecord(listing)) {
-      throw new Error(`${label}中的房源数据格式不正确`);
-    }
-    if (listing.id !== undefined && String(listing.id) !== listingId) {
-      throw new Error(`${label}中的房源 ID 不一致`);
-    }
-
-    normalized[listingId] = {
-      id: listingId,
-      title: normalizedTitle(listing.title, listingId, label),
-      url: canonicalListingUrl(listingId, listing.url, label),
-      [timestampKey]: normalizedTimestamp(listing[timestampKey], label)
-    } as unknown as TimestampedListing<Key>;
-  });
-  return normalized;
-}
-
-function parseBackup(text: string): ImportedBackupData {
-  let backup: unknown;
-  try {
-    backup = JSON.parse(text);
-  } catch {
-    throw new Error("文件不是有效的 JSON");
-  }
-
-  if (
-    !isPlainRecord(backup) ||
-    backup.format !== BACKUP_FORMAT ||
-    (backup.schemaVersion !== 1 &&
-      backup.schemaVersion !== BACKUP_SCHEMA_VERSION) ||
-    !isPlainRecord(backup.data)
-  ) {
-    throw new Error("不是有效的 Wellcee Notes 备份文件");
-  }
-
-  const backupData = backup.data;
-  const favorites = normalizeListingRecords(
-    backupData.favorites,
-    "收藏数据",
-    "createdAt"
-  );
-  const ratings: Ratings =
-    backup.schemaVersion === 1 ? {} : normalizeRatings(backupData.ratings);
-
-  Object.keys(ratings).forEach((listingId) => {
-    if (!favorites[listingId]) {
-      throw new Error(`房源 ${listingId} 未收藏，不能导入评分`);
-    }
-  });
-
-  return {
-    notes: normalizeNotes(backupData.notes),
-    noteDetails: normalizeListingRecords(
-      backupData.noteDetails,
-      "笔记房源数据",
-      "updatedAt"
-    ),
-    favorites,
-    ratings
-  };
 }
 
 function setDataStatus(
@@ -573,373 +362,40 @@ async function handleImport(event: Event): Promise<void> {
     setDataActionsBusy(false);
   }
 }
-
-function getViewModel() {
-  const ratings = storedData[RATINGS_KEY] || {};
-  const defaultFavoriteOrder = (
-    left: FavoriteListing,
-    right: FavoriteListing
-  ) =>
-    (right.createdAt || 0) - (left.createdAt || 0);
-  const favorites = Object.values(storedData[FAVORITES_KEY] || {}).sort(
-    sortMode === "rating"
-      ? (left, right) =>
-          (ratings[right.id] || 0) - (ratings[left.id] || 0) ||
-          defaultFavoriteOrder(left, right)
-      : defaultFavoriteOrder
-  );
-  const notes = storedData[NOTES_KEY] || {};
-  const noteDetails = storedData[NOTE_DETAILS_KEY] || {};
-  const defaultNoteOrder = (
-    [leftId]: [ListingId, string],
-    [rightId]: [ListingId, string]
-  ) =>
-    (noteDetails[rightId]?.updatedAt || 0) -
-    (noteDetails[leftId]?.updatedAt || 0);
-  const noteEntries = Object.entries(notes)
-    .filter(([, note]) => typeof note === "string" && note.trim())
-    .reverse();
-  const favoritesById: Favorites = Object.fromEntries(
-    favorites.map((favorite) => [String(favorite.id), favorite])
-  );
-  noteEntries.sort(
-    sortMode === "rating"
-      ? (left, right) => {
-          const [leftId] = left;
-          const [rightId] = right;
-          const leftRating = favoritesById[leftId] ? ratings[leftId] || 0 : 0;
-          const rightRating = favoritesById[rightId]
-            ? ratings[rightId] || 0
-            : 0;
-          return rightRating - leftRating || defaultNoteOrder(left, right);
-        }
-      : defaultNoteOrder
-  );
-
-  return { favorites, favoritesById, notes, noteDetails, noteEntries, ratings };
-}
-
-function ratingStatusTemplate(rating: number, isFavorite = true) {
-  if (!isFavorite) {
-    return html`
-      <span class="favorite-item__rating favorite-item__rating--unavailable">
-        未收藏
-      </span>
-    `;
-  }
-  if (rating) {
-    return html`
-      <span
-        class="favorite-item__rating"
-        data-rated="true"
-        aria-label=${`评分 ${rating} 星`}
-      >${rating}/5</span>
-    `;
-  }
-  return html`<span class="favorite-item__rating">未评分</span>`;
-}
-
-function currentListingTemplate(listingId: ListingId) {
-  return html`
-    <span
-      class="favorite-item__current"
-      aria-hidden=${String(String(listingId) !== activeListingId)}
-    >当前浏览</span>
-  `;
-}
-
-function favoriteItemTemplate(
-  favorite: FavoriteListing,
-  note: string | undefined,
-  rating: number
-) {
-  const listingId = String(favorite.id);
-  const isCurrent = listingId === activeListingId;
-  const title = favorite.title || `Wellcee 房源 ${favorite.id}`;
-  return html`
-    <article
-      class=${`favorite-item${isCurrent ? " favorite-item--current" : ""}`}
-      data-listing-id=${listingId}
-    >
-      <a
-        class="favorite-item__link"
-        href=${favorite.url}
-        title="打开房源"
-        @click=${(event: MouseEvent) => {
-          event.preventDefault();
-          openListing(favorite.url);
-        }}
-      >
-        ${currentListingTemplate(listingId)}
-        <strong class="favorite-item__title">${title}</strong>
-        <div class="favorite-item__meta-row">
-          <span class="favorite-item__meta">房源 #${favorite.id}</span>
-          ${ratingStatusTemplate(rating)}
-        </div>
-        ${note?.trim()
-          ? html`<p class="favorite-item__note">${note}</p>`
-          : nothing}
-      </a>
-      <button
-        class="favorite-item__remove"
-        type="button"
-        aria-label=${`取消收藏 ${title}`}
-        title="取消收藏"
-        ?disabled=${busyListings.has(listingId)}
-        @click=${() =>
-          runListingAction(listingId, () => removeFavorite(listingId))}
-      ></button>
-    </article>
-  `;
-}
-
-function noteItemTemplate(
-  listingId: ListingId,
-  note: string,
-  details: NoteDetails | undefined,
-  favorite: FavoriteListing | undefined,
-  rating: number
-) {
-  const listing = details || favorite;
-  const url = listing?.url || `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`;
-  const title = listing?.title || `Wellcee 房源 ${listingId}`;
-  const isFavorite = Boolean(favorite);
-  const isCurrent = String(listingId) === activeListingId;
-  return html`
-    <article
-      class=${`favorite-item favorite-item--note${isCurrent ? " favorite-item--current" : ""}`}
-      data-listing-id=${String(listingId)}
-    >
-      <a
-        class="favorite-item__link"
-        href=${url}
-        title="打开房源"
-        @click=${(event: MouseEvent) => {
-          event.preventDefault();
-          openListing(url);
-        }}
-      >
-        ${currentListingTemplate(listingId)}
-        <strong class="favorite-item__title">${title}</strong>
-        <div class="favorite-item__meta-row">
-          <span class="favorite-item__meta">房源 #${listingId}</span>
-          ${ratingStatusTemplate(rating, isFavorite)}
-        </div>
-        <p class="favorite-item__note">${note}</p>
-      </a>
-      <button
-        class="favorite-item__favorite-state"
-        type="button"
-        aria-pressed=${String(isFavorite)}
-        aria-label=${isFavorite ? `取消收藏 ${title}` : `收藏 ${title}`}
-        title=${isFavorite ? "取消收藏" : "收藏房源"}
-        ?disabled=${busyListings.has(String(listingId))}
-        @click=${() =>
-          runListingAction(listingId, () =>
-            toggleFavorite(listingId, listing)
-          )}
-      ></button>
-    </article>
-  `;
-}
-
-function emptyStateTemplate(type: "favorite" | "note") {
-  const favorite = type === "favorite";
-  return html`
-    <div class="empty-state">
-      <span
-        class=${`empty-state__icon empty-state__icon--${type}`}
-        aria-hidden="true"
-      ></span>
-      <strong>${favorite ? "还没有收藏房源" : "还没有房源笔记"}</strong>
-      <p>
-        ${favorite
-          ? "在 Wellcee 列表或详情页点击收藏按钮，房源链接就会出现在这里。"
-          : "在 Wellcee 房源详情页输入笔记后，对应房源会出现在这里。"}
-      </p>
-    </div>
-  `;
-}
-
-function appTemplate() {
-  const { favorites, favoritesById, notes, noteDetails, noteEntries, ratings } =
-    getViewModel();
-  const showFavorites = viewMode === "favorites";
-  const sortByRating = sortMode === "rating";
-
-  return html`
-    <header class="header">
-      <div>
-        <span class="eyebrow">WELLCEE NOTES</span>
-        <h1>我的房源</h1>
-      </div>
-      ${isPopupSurface
-        ? html`
-            <button
-              id="open-side-panel"
-              class="open-side-panel"
-              type="button"
-              ?disabled=${sidePanelBusy}
-              @click=${openSidePanel}
-            >侧边栏</button>
-          `
-        : html`<p class="sidepanel-intro">收藏与私人笔记</p>`}
-    </header>
-
-    <nav class="view-tabs" role="tablist" aria-label="房源列表">
-      <button
-        id="favorite-tab"
-        class=${`view-tab${showFavorites ? " is-active" : ""}`}
-        type="button"
-        role="tab"
-        aria-selected=${String(showFavorites)}
-        aria-controls="favorite-panel"
-        @click=${() => selectView("favorites")}
-      >
-        收藏
-        <span class="view-tab__count" aria-hidden="true">${favorites.length}</span>
-      </button>
-      <button
-        id="note-tab"
-        class=${`view-tab${showFavorites ? "" : " is-active"}`}
-        type="button"
-        role="tab"
-        aria-selected=${String(!showFavorites)}
-        aria-controls="note-panel"
-        @click=${() => selectView("notes")}
-      >
-        有笔记
-        <span class="view-tab__count" aria-hidden="true">${noteEntries.length}</span>
-      </button>
-    </nav>
-
-    <div class="sort-bar" aria-label="列表设置">
-      <div class="open-mode" aria-label="房源打开方式">
-        <span class=${`open-mode__choice${openInNewTab ? "" : " is-active"}`}>
-          当前页面
-        </span>
-        <label class="open-mode__switch">
-          <input
-            id="open-in-new-tab"
-            class="open-mode__input"
-            type="checkbox"
-            role="switch"
-            aria-label="使用新标签页打开房源"
-            .checked=${openInNewTab}
-            ?disabled=${openModeBusy}
-            @change=${changeOpenMode}
-          >
-          <span class="open-mode__track" aria-hidden="true"></span>
-        </label>
-        <span class=${`open-mode__choice${openInNewTab ? " is-active" : ""}`}>
-          新标签页
-        </span>
-      </div>
-      <div class="sort-bar__group">
-        <span class="sort-bar__label">排序</span>
-        <div class="sort-toggle" role="group" aria-label="选择排序方式">
-          <button
-            class=${`sort-toggle__button${sortByRating ? "" : " is-active"}`}
-            type="button"
-            aria-pressed=${String(!sortByRating)}
-            @click=${() => selectSortMode("default")}
-          >默认</button>
-          <button
-            class=${`sort-toggle__button${sortByRating ? " is-active" : ""}`}
-            type="button"
-            aria-pressed=${String(sortByRating)}
-            @click=${() => selectSortMode("rating")}
-          >评分</button>
-        </div>
-      </div>
-    </div>
-
-    <main>
-      <div class="view-track" data-view=${viewMode}>
-        <section
-          id="favorite-panel"
-          class="view-panel"
-          role="tabpanel"
-          aria-labelledby="favorite-tab"
-          aria-hidden=${String(!showFavorites)}
-          ?inert=${!showFavorites}
-        >
-          ${favorites.length
-            ? html`
-                <div class="listing-list" aria-live="polite">
-                  ${favorites.map((favorite) =>
-                    favoriteItemTemplate(
-                      favorite,
-                      notes[favorite.id],
-                      ratings[favorite.id] ?? 0
-                    )
-                  )}
-                </div>
-              `
-            : emptyStateTemplate("favorite")}
-        </section>
-
-        <section
-          id="note-panel"
-          class="view-panel"
-          role="tabpanel"
-          aria-labelledby="note-tab"
-          aria-hidden=${String(showFavorites)}
-          ?inert=${showFavorites}
-        >
-          ${noteEntries.length
-            ? html`
-                <div class="listing-list" aria-live="polite">
-                  ${noteEntries.map(([listingId, note]) =>
-                    noteItemTemplate(
-                      listingId,
-                      note,
-                      noteDetails[listingId],
-                      favoritesById[listingId],
-                      favoritesById[listingId] ? ratings[listingId] ?? 0 : 0
-                    )
-                  )}
-                </div>
-              `
-            : emptyStateTemplate("note")}
-        </section>
-      </div>
-    </main>
-
-    <footer class="data-footer">
-      <div class="data-actions">
-        <button
-          class="data-action"
-          type="button"
-          ?disabled=${dataActionsBusy}
-          @click=${exportData}
-        >导出数据</button>
-        <button
-          class="data-action"
-          type="button"
-          ?disabled=${dataActionsBusy}
-          @click=${() => document.getElementById("import-file")?.click()}
-        >导入数据</button>
-        <input
-          id="import-file"
-          type="file"
-          accept=".json,application/json"
-          hidden
-          @change=${handleImport}
-        >
-      </div>
-      <span
-        class="data-status"
-        role="status"
-        aria-live="polite"
-        data-state=${dataStatus.state}
-      >${dataStatus.message}</span>
-    </footer>
-  `;
-}
+const viewActions: PopupViewActions = {
+  changeOpenMode: (event) => void changeOpenMode(event),
+  exportData: () => void exportData(),
+  handleImport: (event) => void handleImport(event),
+  openListing: (url) => void openListing(url),
+  openSidePanel: () => void openSidePanel(),
+  removeFavorite: (listingId) =>
+    void runListingAction(listingId, () => removeFavorite(listingId)),
+  selectSortMode,
+  selectView,
+  toggleFavorite: (listingId, listing) =>
+    void runListingAction(listingId, () => toggleFavorite(listingId, listing))
+};
 
 function renderApp(): void {
-  renderTemplate(appTemplate(), appRoot);
+  renderTemplate(
+    appTemplate(
+      {
+        activeListingId,
+        busyListings,
+        dataActionsBusy,
+        dataStatus,
+        isPopupSurface,
+        openInNewTab,
+        openModeBusy,
+        sidePanelBusy,
+        sortMode,
+        storedData,
+        viewMode
+      },
+      viewActions
+    ),
+    appRoot
+  );
 }
 
 chrome.storage.onChanged.addListener((changes, areaName) => {

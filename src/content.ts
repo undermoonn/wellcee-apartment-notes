@@ -1,4 +1,36 @@
-import { html, nothing, render as renderTemplate } from "lit-html";
+import { nothing, render as renderTemplate } from "lit-html";
+import {
+  ACTIVE_LISTING_REQUEST,
+  FAVORITES_KEY,
+  LISTING_CHANGED_MESSAGE,
+  NOTES_KEY,
+  NOTE_DETAILS_KEY,
+  RATINGS_KEY
+} from "./constants.js";
+import {
+  EDITOR_ID,
+  EDITOR_MOUNT_ID,
+  editorTemplate,
+  FAVORITE_ANCHOR_CLASS,
+  LISTING_DECORATION_CLASS,
+  listingDecorationTemplate,
+  NOTE_ANCHOR_CLASS
+} from "./content-view.js";
+import type {
+  ContentViewActions,
+  ContentViewState,
+  DetailEditorState,
+  SaveState
+} from "./content-view.js";
+import { getStoredRecord, setStoredRecord } from "./storage.js";
+import {
+  currentListingId,
+  detailPageTitle,
+  favoriteTitle,
+  findDetailsHeading,
+  isListPage,
+  listingIdFromHref
+} from "./wellcee-page.js";
 import type {
   Favorites,
   ListingId,
@@ -13,16 +45,6 @@ declare global {
   }
 }
 
-type FavoritePlacement = "list" | "detail";
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-interface DetailEditorState {
-  listingId: ListingId;
-  draft: string;
-  saveMessage: string;
-  saveState: SaveState;
-}
-
 (() => {
   "use strict";
 
@@ -31,20 +53,6 @@ interface DetailEditorState {
   }
   window.__wellceeNotesLoaded = true;
 
-  const STORAGE_KEY = "wellceeApartmentNotes";
-  const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
-  const FAVORITES_KEY = "wellceeApartmentFavorites";
-  const RATINGS_KEY = "wellceeApartmentRatings";
-  const NOTE_BADGE_CLASS = "wellcee-note-badge";
-  const NOTE_ANCHOR_CLASS = "wellcee-note-anchor";
-  const FAVORITE_BUTTON_CLASS = "wellcee-favorite-button";
-  const FAVORITE_ANCHOR_CLASS = "wellcee-favorite-anchor";
-  const LISTING_DECORATION_CLASS = "wellcee-listing-decoration";
-  const EDITOR_ID = "wellcee-note-editor";
-  const EDITOR_MOUNT_ID = "wellcee-note-editor-mount";
-  const ACTIVE_LISTING_REQUEST = "wellcee:get-active-listing";
-  const LISTING_CHANGED_MESSAGE = "wellcee:listing-changed";
-  const MAX_NOTE_LENGTH = 2000;
   const SAVE_DELAY_MS = 400;
 
   let notes: Notes = {};
@@ -61,36 +69,22 @@ interface DetailEditorState {
   const pendingDetailTitleUpdates = new Set<ListingId>();
   const pendingDetailNoteUpdates = new Set<ListingId>();
 
-  function isWellceeHost(hostname: string): boolean {
-    return hostname === "wellcee.com" || hostname === "www.wellcee.com";
-  }
+  const contentViewActions: ContentViewActions = {
+    changeRating: (listingId, nextRating) =>
+      void changeRating(listingId, nextRating),
+    favoriteClick: (event, listingId, anchor) =>
+      void handleFavoriteClick(event, listingId, anchor),
+    flushPendingNote: (listingId) => void flushPendingNote(listingId),
+    scheduleSave
+  };
 
-  function listingIdFromPathname(pathname: string): ListingId | null {
-    const match = pathname.match(/^\/rent-apartment\/(\d+)\/?$/);
-    return match?.[1] ?? null;
-  }
-
-  function listingIdFromHref(href: string | null): ListingId | null {
-    if (!href) {
-      return null;
-    }
-
-    try {
-      const url = new URL(href, window.location.origin);
-      return isWellceeHost(url.hostname)
-        ? listingIdFromPathname(url.pathname)
-        : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function isListPage(): boolean {
-    return /^\/rent-apartment\/[^/]+\/list\/?$/.test(window.location.pathname);
-  }
-
-  function currentListingId(): ListingId | null {
-    return listingIdFromPathname(window.location.pathname);
+  function getContentViewState(): ContentViewState {
+    return {
+      favoriteBusyIds,
+      favorites,
+      ratingBusy,
+      ratings
+    };
   }
 
   function notifyListingChanged(): void {
@@ -100,36 +94,9 @@ interface DetailEditorState {
     );
   }
 
-  function getStoredRecord<T extends object>(key: string): Promise<T> {
-    return new Promise<T>((resolve) => {
-      chrome.storage.local.get({ [key]: {} }, (result) => {
-        if (chrome.runtime.lastError) {
-          console.warn("[Wellcee Notes] 无法读取本地数据", chrome.runtime.lastError);
-          resolve({} as T);
-          return;
-        }
-
-        const stored = result[key];
-        resolve(stored && typeof stored === "object" ? (stored as T) : ({} as T));
-      });
-    });
-  }
-
-  function setStoredRecord<T extends object>(key: string, value: T): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      chrome.storage.local.set({ [key]: value }, () => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-          return;
-        }
-        resolve();
-      });
-    });
-  }
-
   async function saveNote(listingId: ListingId, value: string): Promise<void> {
     const [latestNotes, latestNoteDetails] = await Promise.all([
-      getStoredRecord<Notes>(STORAGE_KEY),
+      getStoredRecord<Notes>(NOTES_KEY),
       getStoredRecord<NoteDetailsById>(NOTE_DETAILS_KEY)
     ]);
 
@@ -152,7 +119,7 @@ interface DetailEditorState {
     }
 
     await Promise.all([
-      setStoredRecord(STORAGE_KEY, latestNotes),
+      setStoredRecord(NOTES_KEY, latestNotes),
       setStoredRecord(NOTE_DETAILS_KEY, latestNoteDetails)
     ]);
     notes = latestNotes;
@@ -177,65 +144,6 @@ interface DetailEditorState {
 
     await setStoredRecord(RATINGS_KEY, latestRatings);
     ratings = latestRatings;
-  }
-
-  function compactText(value: string): string {
-    return value.replace(/\s+/g, " ").trim();
-  }
-
-  function priceFromAnchor(anchor: HTMLAnchorElement | null): string | null {
-    if (!anchor) {
-      return null;
-    }
-
-    const exactPricePattern = /^(?:\d{1,3}(?:,\d{3})+|\d{2,6})(?:\.\d+)?\s*RMB\s*\/\s*月$/i;
-    const priceElement = Array.from(anchor.querySelectorAll<HTMLElement>("*")).find((element) =>
-      exactPricePattern.test(compactText(element.textContent || ""))
-    );
-
-    if (priceElement) {
-      return compactText(priceElement.textContent || "").replace(/\s+/g, " ");
-    }
-
-    const visibleText = anchor.innerText || "";
-    const linePrice = visibleText
-      .split("\n")
-      .map(compactText)
-      .find((line) => exactPricePattern.test(line));
-
-    return linePrice || null;
-  }
-
-  function detailPageTitle(): string {
-    return compactText(document.title).replace(/\s*-\s*Wellcee.*$/i, "");
-  }
-
-  function favoriteTitle(
-    listingId: ListingId,
-    anchor: HTMLAnchorElement | null = null
-  ): string {
-    if (currentListingId() === listingId) {
-      const pageTitle = detailPageTitle();
-      if (pageTitle) {
-        return pageTitle;
-      }
-    }
-
-    const anchorText = compactText(anchor?.textContent || "");
-    const price = priceFromAnchor(anchor);
-    if (price) {
-      return `${price} · Wellcee 房源 ${listingId}`;
-    }
-
-    const heading = anchor?.querySelector<HTMLElement>(
-      "h1, h2, h3, h4, [role='heading']"
-    );
-    const headingText = compactText(heading?.textContent || "");
-    if (headingText) {
-      return headingText.slice(0, 80);
-    }
-
-    return anchorText ? anchorText.slice(0, 80) : `Wellcee 房源 ${listingId}`;
   }
 
   async function updateFavoriteTitleFromDetail(listingId: ListingId): Promise<void> {
@@ -287,7 +195,7 @@ interface DetailEditorState {
     pendingDetailNoteUpdates.add(listingId);
     try {
       const [latestNotes, latestNoteDetails] = await Promise.all([
-        getStoredRecord<Notes>(STORAGE_KEY),
+        getStoredRecord<Notes>(NOTES_KEY),
         getStoredRecord<NoteDetailsById>(NOTE_DETAILS_KEY)
       ]);
       if (!latestNotes[listingId]?.trim()) {
@@ -368,45 +276,6 @@ interface DetailEditorState {
     }
   }
 
-  function favoriteButtonTemplate(
-    listingId: ListingId,
-    anchor: HTMLAnchorElement | null,
-    placement: FavoritePlacement
-  ) {
-    const isFavorite = Boolean(favorites[listingId]);
-    return html`
-      <button
-        class=${`${FAVORITE_BUTTON_CLASS} ${FAVORITE_BUTTON_CLASS}--${placement}`}
-        type="button"
-        aria-pressed=${String(isFavorite)}
-        aria-label=${isFavorite ? "取消收藏此房源" : "收藏此房源"}
-        title=${isFavorite ? "取消收藏" : "收藏房源"}
-        ?disabled=${favoriteBusyIds.has(listingId)}
-        @pointerdown=${(event: PointerEvent) => {
-          event.stopPropagation();
-        }}
-        @click=${(event: MouseEvent) => handleFavoriteClick(event, listingId, anchor)}
-      ></button>
-    `;
-  }
-
-  function listingDecorationTemplate(
-    listingId: ListingId,
-    anchor: HTMLAnchorElement,
-    note: string | undefined
-  ) {
-    return html`
-      ${favoriteButtonTemplate(listingId, anchor, "list")}
-      ${note?.trim()
-        ? html`
-            <span
-              class=${NOTE_BADGE_CLASS}
-              aria-label=${`我的房源笔记：${compactText(note)}`}
-            >${note}</span>
-          `
-        : nothing}
-    `;
-  }
 
   function removeListDecorations(): void {
     document
@@ -454,7 +323,16 @@ interface DetailEditorState {
         host.className = LISTING_DECORATION_CLASS;
         anchor.appendChild(host);
       }
-      renderTemplate(listingDecorationTemplate(listingId, anchor, note), host);
+      renderTemplate(
+        listingDecorationTemplate(
+          listingId,
+          anchor,
+          note,
+          getContentViewState(),
+          contentViewActions
+        ),
+        host
+      );
     });
 
     document
@@ -479,31 +357,6 @@ interface DetailEditorState {
    * UI below is rendered declaratively with lit-html. Mount nodes are the only
    * imperative DOM additions because they must coexist with Wellcee's Vue tree.
    */
-
-  function normalizeText(value: string): string {
-    return value.replace(/\s+/g, "").trim();
-  }
-
-  function findDetailsHeading(): HTMLElement | null {
-    const headingSelectors = "h1, h2, h3, h4, [role='heading']";
-    const semanticHeading = Array.from(
-      document.querySelectorAll<HTMLElement>(headingSelectors)
-    ).find((element) => normalizeText(element.textContent || "") === "详情");
-
-    if (semanticHeading) {
-      return semanticHeading;
-    }
-
-    return (
-      Array.from(
-        document.querySelectorAll<HTMLElement>("main div, main p, main span")
-      ).find(
-        (element) =>
-          element.children.length === 0 &&
-          normalizeText(element.textContent || "") === "详情"
-      ) ?? null
-    );
-  }
 
   function setDetailSaveStatus(
     message: string,
@@ -593,97 +446,6 @@ interface DetailEditorState {
     }
   }
 
-  function ratingTemplate(listingId: ListingId) {
-    const isFavorite = Boolean(favorites[listingId]);
-    const rating = isFavorite ? Number(ratings[listingId]) || 0 : 0;
-    return html`
-      <div class="wellcee-rating" data-locked=${String(!isFavorite)}>
-        <div class="wellcee-rating__label-group">
-          <span class="wellcee-rating__label">我的评分</span>
-          <span class="wellcee-rating__value">
-            ${isFavorite ? (rating ? `${rating}/5` : "未评分") : "收藏后可评分"}
-          </span>
-        </div>
-        <div class="wellcee-rating__actions">
-          <div
-            class="wellcee-rating__stars"
-            role="radiogroup"
-            aria-label="给收藏房源评分"
-          >
-            ${[1, 2, 3, 4, 5].map(
-              (starValue) => html`
-                <button
-                  class=${`wellcee-rating__star${starValue <= rating ? " is-active" : ""}`}
-                  type="button"
-                  role="radio"
-                  aria-label=${`${starValue} 星`}
-                  aria-checked=${String(starValue === rating)}
-                  ?disabled=${!isFavorite || ratingBusy}
-                  @click=${() => changeRating(listingId, starValue)}
-                ></button>
-              `
-            )}
-          </div>
-          <button
-            class="wellcee-rating__clear"
-            type="button"
-            ?hidden=${!isFavorite || rating === 0}
-            ?disabled=${!isFavorite || ratingBusy}
-            @click=${() => changeRating(listingId, 0)}
-          >清除</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function editorTemplate(listingId: ListingId, editorState: DetailEditorState) {
-    return html`
-      <section
-        id=${EDITOR_ID}
-        class="wellcee-note-editor"
-        data-listing-id=${listingId}
-        aria-labelledby="wellcee-note-editor-title"
-      >
-        <div class="wellcee-note-editor__header">
-          <div class="wellcee-note-editor__title-group">
-            <span class="wellcee-note-editor__eyebrow">PRIVATE NOTE</span>
-            <h2 id="wellcee-note-editor-title" class="wellcee-note-editor__title">
-              我的房源笔记
-            </h2>
-          </div>
-          <div class="wellcee-note-editor__actions">
-            <span
-              class="wellcee-note-editor__status"
-              data-state=${editorState.saveState}
-            >${editorState.saveMessage}</span>
-            ${favoriteButtonTemplate(listingId, null, "detail")}
-          </div>
-        </div>
-        ${ratingTemplate(listingId)}
-        <textarea
-          class="wellcee-note-editor__textarea"
-          maxlength=${MAX_NOTE_LENGTH}
-          rows="4"
-          placeholder="例：采光不错；次卧临街，复看时确认隔音；可和房东谈到 1650。"
-          aria-label="输入这套房源的私人笔记"
-          .value=${editorState.draft}
-          @input=${(event: InputEvent) => {
-            editorState.draft = (event.currentTarget as HTMLTextAreaElement).value;
-            scheduleSave(listingId);
-          }}
-          @blur=${() => flushPendingNote(listingId)}
-        ></textarea>
-        <div class="wellcee-note-editor__footer">
-          <span class="wellcee-note-editor__privacy">
-            仅保存在当前 Chrome，不会发送给 Wellcee
-          </span>
-          <span class="wellcee-note-editor__count">
-            ${editorState.draft.length}/${MAX_NOTE_LENGTH}
-          </span>
-        </div>
-      </section>
-    `;
-  }
 
   function renderDetailEditor(): void {
     const listingId = currentListingId();
@@ -732,7 +494,15 @@ interface DetailEditorState {
       heading.parentElement.appendChild(mount);
     }
 
-    renderTemplate(editorTemplate(listingId, detailEditorState), mount);
+    renderTemplate(
+      editorTemplate(
+        listingId,
+        detailEditorState,
+        getContentViewState(),
+        contentViewActions
+      ),
+      mount
+    );
   }
 
   function refreshPage(): void {
@@ -781,11 +551,11 @@ interface DetailEditorState {
         (changes[NOTE_DETAILS_KEY].newValue as NoteDetailsById | undefined) ?? {};
     }
 
-    if (!changes[STORAGE_KEY]) {
+    if (!changes[NOTES_KEY]) {
       return;
     }
 
-    notes = (changes[STORAGE_KEY].newValue as Notes | undefined) ?? {};
+    notes = (changes[NOTES_KEY].newValue as Notes | undefined) ?? {};
     renderListBadges();
 
     const listingId = currentListingId();
@@ -844,7 +614,7 @@ interface DetailEditorState {
   }, 600);
 
   Promise.all([
-    getStoredRecord<Notes>(STORAGE_KEY),
+    getStoredRecord<Notes>(NOTES_KEY),
     getStoredRecord<NoteDetailsById>(NOTE_DETAILS_KEY),
     getStoredRecord<Favorites>(FAVORITES_KEY),
     getStoredRecord<Ratings>(RATINGS_KEY)
