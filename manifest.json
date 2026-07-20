@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wellcee 房源笔记",
   "version": "1.0.0",
-  "description": "在 Wellcee 房源上记录私人笔记、添加收藏，并从扩展图标快速查看收藏和有笔记的房源。",
+  "description": "在 Wellcee 房源上记录私人笔记、添加收藏和评分，并从扩展图标快速查看房源列表。",
   "permissions": [
     "storage",
     "sidePanel"

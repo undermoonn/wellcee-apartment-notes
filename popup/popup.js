@@ -4,9 +4,10 @@
   const FAVORITES_KEY = "wellceeApartmentFavorites";
   const NOTES_KEY = "wellceeApartmentNotes";
   const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
+  const RATINGS_KEY = "wellceeApartmentRatings";
   const WELLCEE_ORIGIN = "https://www.wellcee.com";
   const BACKUP_FORMAT = "wellcee-notes-backup";
-  const BACKUP_SCHEMA_VERSION = 1;
+  const BACKUP_SCHEMA_VERSION = 2;
   const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
   const MAX_NOTE_LENGTH = 2000;
   const ACTIVE_LISTING_REQUEST = "wellcee:get-active-listing";
@@ -23,6 +24,8 @@
   const noteEmptyState = document.getElementById("note-empty-state");
   const favoriteCount = document.getElementById("favorite-count");
   const noteCount = document.getElementById("note-count");
+  const sortDefaultButton = document.getElementById("sort-default");
+  const sortRatingButton = document.getElementById("sort-rating");
   const openSidePanelButton = document.getElementById("open-side-panel");
   const exportButton = document.getElementById("export-data");
   const importButton = document.getElementById("import-data");
@@ -34,6 +37,7 @@
   let activeListingId = null;
   let activeListingRequest = 0;
   let hasRendered = false;
+  let sortMode = "default";
   const isPopupSurface = document.body.dataset.surface === "popup";
 
   async function refreshActiveListing() {
@@ -97,7 +101,8 @@
         {
           [FAVORITES_KEY]: {},
           [NOTES_KEY]: {},
-          [NOTE_DETAILS_KEY]: {}
+          [NOTE_DETAILS_KEY]: {},
+          [RATINGS_KEY]: {}
         },
         (result) => resolve(result)
       );
@@ -188,6 +193,22 @@
     return normalized;
   }
 
+  function normalizeRatings(value) {
+    if (!isPlainRecord(value)) {
+      throw new Error("评分数据格式不正确");
+    }
+
+    const normalized = {};
+    Object.entries(value).forEach(([listingId, rating]) => {
+      assertListingId(listingId, "评分数据");
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw new Error(`房源 ${listingId} 的评分必须是 1 到 5 星`);
+      }
+      normalized[listingId] = rating;
+    });
+    return normalized;
+  }
+
   function normalizeListingRecords(value, label, timestampKey) {
     if (!isPlainRecord(value)) {
       throw new Error(`${label}格式不正确`);
@@ -224,11 +245,27 @@
     if (
       !isPlainRecord(backup) ||
       backup.format !== BACKUP_FORMAT ||
-      backup.schemaVersion !== BACKUP_SCHEMA_VERSION ||
+      ![1, BACKUP_SCHEMA_VERSION].includes(backup.schemaVersion) ||
       !isPlainRecord(backup.data)
     ) {
       throw new Error("不是有效的 Wellcee Notes 备份文件");
     }
+
+    const favorites = normalizeListingRecords(
+      backup.data.favorites,
+      "收藏数据",
+      "createdAt"
+    );
+    const ratings =
+      backup.schemaVersion === 1
+        ? {}
+        : normalizeRatings(backup.data.ratings);
+
+    Object.keys(ratings).forEach((listingId) => {
+      if (!favorites[listingId]) {
+        throw new Error(`房源 ${listingId} 未收藏，不能导入评分`);
+      }
+    });
 
     return {
       notes: normalizeNotes(backup.data.notes),
@@ -237,11 +274,8 @@
         "笔记房源数据",
         "updatedAt"
       ),
-      favorites: normalizeListingRecords(
-        backup.data.favorites,
-        "收藏数据",
-        "createdAt"
-      )
+      favorites,
+      ratings
     };
   }
 
@@ -271,6 +305,7 @@
       const result = await getStoredData();
       const notes = result[NOTES_KEY] || {};
       const favorites = result[FAVORITES_KEY] || {};
+      const ratings = result[RATINGS_KEY] || {};
       const backup = {
         format: BACKUP_FORMAT,
         schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -279,7 +314,8 @@
         data: {
           notes,
           noteDetails: result[NOTE_DETAILS_KEY] || {},
-          favorites
+          favorites,
+          ratings
         }
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], {
@@ -294,7 +330,7 @@
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
       setDataStatus(
-        `已导出 ${Object.keys(notes).length} 条笔记、${Object.keys(favorites).length} 条收藏`,
+        `已导出 ${Object.keys(notes).length} 条笔记、${Object.keys(favorites).length} 条收藏、${Object.keys(ratings).length} 个评分`,
         "success"
       );
     } catch (error) {
@@ -312,6 +348,20 @@
 
     const imported = parseBackup(await file.text());
     const current = await getStoredData();
+    const mergedFavorites = {
+      ...(current[FAVORITES_KEY] || {}),
+      ...imported.favorites
+    };
+    const mergedRatings = {
+      ...(current[RATINGS_KEY] || {}),
+      ...imported.ratings
+    };
+    Object.keys(mergedRatings).forEach((listingId) => {
+      if (!mergedFavorites[listingId]) {
+        delete mergedRatings[listingId];
+      }
+    });
+
     await setStoredData({
       [NOTES_KEY]: {
         ...(current[NOTES_KEY] || {}),
@@ -321,48 +371,51 @@
         ...(current[NOTE_DETAILS_KEY] || {}),
         ...imported.noteDetails
       },
-      [FAVORITES_KEY]: {
-        ...(current[FAVORITES_KEY] || {}),
-        ...imported.favorites
-      }
+      [FAVORITES_KEY]: mergedFavorites,
+      [RATINGS_KEY]: mergedRatings
     });
 
     return {
       noteCount: Object.keys(imported.notes).length,
-      favoriteCount: Object.keys(imported.favorites).length
+      favoriteCount: Object.keys(imported.favorites).length,
+      ratingCount: Object.keys(imported.ratings).length
     };
   }
 
-  function removeFavorite(listingId) {
-    return new Promise((resolve) => {
-      chrome.storage.local.get({ [FAVORITES_KEY]: {} }, (result) => {
-        const favorites = result[FAVORITES_KEY] || {};
-        delete favorites[listingId];
-        chrome.storage.local.set({ [FAVORITES_KEY]: favorites }, resolve);
-      });
+  async function removeFavorite(listingId) {
+    const result = await getStoredData();
+    const favorites = result[FAVORITES_KEY] || {};
+    const ratings = result[RATINGS_KEY] || {};
+    delete favorites[listingId];
+    delete ratings[listingId];
+    await setStoredData({
+      [FAVORITES_KEY]: favorites,
+      [RATINGS_KEY]: ratings
     });
   }
 
-  function toggleFavorite(listingId, listing) {
-    return new Promise((resolve) => {
-      chrome.storage.local.get({ [FAVORITES_KEY]: {} }, (result) => {
-        const favorites = result[FAVORITES_KEY] || {};
+  async function toggleFavorite(listingId, listing) {
+    const result = await getStoredData();
+    const favorites = result[FAVORITES_KEY] || {};
+    const ratings = result[RATINGS_KEY] || {};
 
-        if (favorites[listingId]) {
-          delete favorites[listingId];
-        } else {
-          favorites[listingId] = {
-            id: listingId,
-            title: listing?.title || `Wellcee 房源 ${listingId}`,
-            url:
-              listing?.url ||
-              `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`,
-            createdAt: Date.now()
-          };
-        }
+    if (favorites[listingId]) {
+      delete favorites[listingId];
+      delete ratings[listingId];
+    } else {
+      favorites[listingId] = {
+        id: listingId,
+        title: listing?.title || `Wellcee 房源 ${listingId}`,
+        url:
+          listing?.url ||
+          `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`,
+        createdAt: Date.now()
+      };
+    }
 
-        chrome.storage.local.set({ [FAVORITES_KEY]: favorites }, resolve);
-      });
+    await setStoredData({
+      [FAVORITES_KEY]: favorites,
+      [RATINGS_KEY]: ratings
     });
   }
 
@@ -378,7 +431,25 @@
     link.appendChild(status);
   }
 
-  function createFavoriteItem(favorite, note) {
+  function createRatingStatus(rating, isFavorite = true) {
+    const status = document.createElement("span");
+    status.className = "favorite-item__rating";
+
+    if (!isFavorite) {
+      status.classList.add("favorite-item__rating--unavailable");
+      status.textContent = "未收藏";
+    } else if (rating) {
+      status.dataset.rated = "true";
+      status.textContent = `${rating}/5`;
+      status.setAttribute("aria-label", `评分 ${rating} 星`);
+    } else {
+      status.textContent = "未评分";
+    }
+
+    return status;
+  }
+
+  function createFavoriteItem(favorite, note, rating) {
     const item = document.createElement("article");
     item.className = "favorite-item";
 
@@ -395,8 +466,12 @@
     meta.className = "favorite-item__meta";
     meta.textContent = `房源 #${favorite.id}`;
 
+    const metaRow = document.createElement("div");
+    metaRow.className = "favorite-item__meta-row";
+    metaRow.append(meta, createRatingStatus(rating));
+
     appendCurrentListingStatus(item, link, favorite.id);
-    link.append(title, meta);
+    link.append(title, metaRow);
 
     if (note?.trim()) {
       const noteText = document.createElement("p");
@@ -425,7 +500,7 @@
     return item;
   }
 
-  function createNoteItem(listingId, note, details, favorite) {
+  function createNoteItem(listingId, note, details, favorite, rating) {
     const listing = details || favorite;
     const item = document.createElement("article");
     item.className = "favorite-item favorite-item--note";
@@ -443,12 +518,16 @@
     meta.className = "favorite-item__meta";
     meta.textContent = `房源 #${listingId}`;
 
+    const metaRow = document.createElement("div");
+    metaRow.className = "favorite-item__meta-row";
+    metaRow.append(meta, createRatingStatus(rating, Boolean(favorite)));
+
     const noteText = document.createElement("p");
     noteText.className = "favorite-item__note";
     noteText.textContent = note;
 
     appendCurrentListingStatus(item, link, listingId);
-    link.append(title, meta, noteText);
+    link.append(title, metaRow, noteText);
     link.addEventListener("click", (event) => {
       event.preventDefault();
       openListing(link.href);
@@ -487,23 +566,46 @@
     noteTab.setAttribute("aria-selected", String(!showFavorites));
   }
 
+  function selectSortMode(mode) {
+    sortMode = mode === "rating" ? "rating" : "default";
+    const sortByRating = sortMode === "rating";
+    sortDefaultButton.classList.toggle("is-active", !sortByRating);
+    sortRatingButton.classList.toggle("is-active", sortByRating);
+    sortDefaultButton.setAttribute("aria-pressed", String(!sortByRating));
+    sortRatingButton.setAttribute("aria-pressed", String(sortByRating));
+    render();
+  }
+
   async function render() {
     const result = await getStoredData();
+    const ratings = result[RATINGS_KEY] || {};
+    const defaultFavoriteOrder = (left, right) =>
+      (right.createdAt || 0) - (left.createdAt || 0);
     const favorites = Object.values(result[FAVORITES_KEY] || {}).sort(
-      (left, right) => (right.createdAt || 0) - (left.createdAt || 0)
+      sortMode === "rating"
+        ? (left, right) =>
+            (ratings[right.id] || 0) - (ratings[left.id] || 0) ||
+            defaultFavoriteOrder(left, right)
+        : defaultFavoriteOrder
     );
     const notes = result[NOTES_KEY] || {};
     const noteDetails = result[NOTE_DETAILS_KEY] || {};
+    const defaultNoteOrder = ([leftId], [rightId]) =>
+      (noteDetails[rightId]?.updatedAt || 0) -
+      (noteDetails[leftId]?.updatedAt || 0);
     const noteEntries = Object.entries(notes)
       .filter(([, note]) => typeof note === "string" && note.trim())
-      .reverse()
-      .sort(
-        ([leftId], [rightId]) =>
-          (noteDetails[rightId]?.updatedAt || 0) -
-          (noteDetails[leftId]?.updatedAt || 0)
-      );
+      .reverse();
     const favoritesById = Object.fromEntries(
       favorites.map((favorite) => [String(favorite.id), favorite])
+    );
+    noteEntries.sort(
+      sortMode === "rating"
+        ? ([leftId], [rightId]) =>
+            (favoritesById[rightId] ? ratings[rightId] || 0 : 0) -
+              (favoritesById[leftId] ? ratings[leftId] || 0 : 0) ||
+            defaultNoteOrder([leftId], [rightId])
+        : defaultNoteOrder
     );
 
     favoriteList.replaceChildren();
@@ -514,7 +616,9 @@
     noteEmptyState.hidden = noteEntries.length > 0;
 
     favorites.forEach((favorite) => {
-      favoriteList.appendChild(createFavoriteItem(favorite, notes[favorite.id]));
+      favoriteList.appendChild(
+        createFavoriteItem(favorite, notes[favorite.id], ratings[favorite.id])
+      );
     });
 
     noteEntries.forEach(([listingId, note]) => {
@@ -523,7 +627,8 @@
           listingId,
           note,
           noteDetails[listingId],
-          favoritesById[listingId]
+          favoritesById[listingId],
+          favoritesById[listingId] ? ratings[listingId] : 0
         )
       );
     });
@@ -531,6 +636,8 @@
 
   favoriteTab.addEventListener("click", () => selectView("favorites"));
   noteTab.addEventListener("click", () => selectView("notes"));
+  sortDefaultButton.addEventListener("click", () => selectSortMode("default"));
+  sortRatingButton.addEventListener("click", () => selectSortMode("rating"));
   openSidePanelButton?.addEventListener("click", async () => {
     openSidePanelButton.disabled = true;
     try {
@@ -561,7 +668,7 @@
       const imported = await importData(file);
       await render();
       setDataStatus(
-        `已导入 ${imported.noteCount} 条笔记、${imported.favoriteCount} 条收藏`,
+        `已导入 ${imported.noteCount} 条笔记、${imported.favoriteCount} 条收藏、${imported.ratingCount} 个评分`,
         "success"
       );
     } catch (error) {
@@ -577,7 +684,8 @@
       areaName === "local" &&
       (changes[FAVORITES_KEY] ||
         changes[NOTES_KEY] ||
-        changes[NOTE_DETAILS_KEY])
+        changes[NOTE_DETAILS_KEY] ||
+        changes[RATINGS_KEY])
     ) {
       render();
     }

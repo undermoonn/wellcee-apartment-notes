@@ -9,6 +9,7 @@
   const STORAGE_KEY = "wellceeApartmentNotes";
   const NOTE_DETAILS_KEY = "wellceeApartmentNoteDetails";
   const FAVORITES_KEY = "wellceeApartmentFavorites";
+  const RATINGS_KEY = "wellceeApartmentRatings";
   const NOTE_BADGE_CLASS = "wellcee-note-badge";
   const NOTE_ANCHOR_CLASS = "wellcee-note-anchor";
   const FAVORITE_BUTTON_CLASS = "wellcee-favorite-button";
@@ -22,6 +23,7 @@
   let notes = {};
   let noteDetails = {};
   let favorites = {};
+  let ratings = {};
   let lastUrl = window.location.href;
   let refreshTimer = null;
   let saveTimer = null;
@@ -121,6 +123,26 @@
     ]);
     notes = latestNotes;
     noteDetails = latestNoteDetails;
+  }
+
+  async function saveRating(listingId, value) {
+    const [latestFavorites, latestRatings] = await Promise.all([
+      getStoredRecord(FAVORITES_KEY),
+      getStoredRecord(RATINGS_KEY)
+    ]);
+
+    if (!latestFavorites[listingId]) {
+      throw new Error("只有收藏的房源可以评分");
+    }
+
+    if (Number.isInteger(value) && value >= 1 && value <= 5) {
+      latestRatings[listingId] = value;
+    } else {
+      delete latestRatings[listingId];
+    }
+
+    await setStoredRecord(RATINGS_KEY, latestRatings);
+    ratings = latestRatings;
   }
 
   function compactText(value) {
@@ -254,10 +276,14 @@
   }
 
   async function toggleFavorite(listingId, anchor = null) {
-    const latestFavorites = await getStoredRecord(FAVORITES_KEY);
+    const [latestFavorites, latestRatings] = await Promise.all([
+      getStoredRecord(FAVORITES_KEY),
+      getStoredRecord(RATINGS_KEY)
+    ]);
 
     if (latestFavorites[listingId]) {
       delete latestFavorites[listingId];
+      delete latestRatings[listingId];
     } else {
       latestFavorites[listingId] = {
         id: listingId,
@@ -267,8 +293,12 @@
       };
     }
 
-    await setStoredRecord(FAVORITES_KEY, latestFavorites);
+    await Promise.all([
+      setStoredRecord(FAVORITES_KEY, latestFavorites),
+      setStoredRecord(RATINGS_KEY, latestRatings)
+    ]);
     favorites = latestFavorites;
+    ratings = latestRatings;
     syncFavoriteButtons();
   }
 
@@ -282,6 +312,7 @@
 
   function syncFavoriteButtons() {
     document.querySelectorAll(`.${FAVORITE_BUTTON_CLASS}`).forEach(syncFavoriteButton);
+    syncDetailRatingControl();
   }
 
   function createFavoriteButton(listingId, anchor, placement) {
@@ -440,6 +471,126 @@
     }, SAVE_DELAY_MS);
   }
 
+  function syncRatingControl(control, listingId) {
+    if (!control) {
+      return;
+    }
+
+    const isFavorite = Boolean(favorites[listingId]);
+    const rating = isFavorite ? Number(ratings[listingId]) || 0 : 0;
+    const value = control.querySelector(".wellcee-rating__value");
+    const clearButton = control.querySelector(".wellcee-rating__clear");
+
+    control.dataset.locked = String(!isFavorite);
+    if (value) {
+      value.textContent = isFavorite
+        ? rating
+          ? `${rating}/5`
+          : "未评分"
+        : "收藏后可评分";
+    }
+
+    control.querySelectorAll(".wellcee-rating__star").forEach((button) => {
+      const starValue = Number(button.dataset.rating);
+      button.disabled = !isFavorite;
+      button.classList.toggle("is-active", starValue <= rating);
+      button.setAttribute("aria-checked", String(starValue === rating));
+    });
+
+    if (clearButton) {
+      clearButton.hidden = !isFavorite || rating === 0;
+      clearButton.disabled = !isFavorite;
+    }
+  }
+
+  function syncDetailRatingControl() {
+    const editor = document.getElementById(EDITOR_ID);
+    const listingId = editor?.dataset.listingId;
+    if (!listingId) {
+      return;
+    }
+    syncRatingControl(editor.querySelector(".wellcee-rating"), listingId);
+  }
+
+  function createRatingControl(listingId) {
+    const control = document.createElement("div");
+    control.className = "wellcee-rating";
+
+    const labelGroup = document.createElement("div");
+    labelGroup.className = "wellcee-rating__label-group";
+
+    const label = document.createElement("span");
+    label.className = "wellcee-rating__label";
+    label.textContent = "我的评分";
+
+    const value = document.createElement("span");
+    value.className = "wellcee-rating__value";
+    labelGroup.append(label, value);
+
+    const actions = document.createElement("div");
+    actions.className = "wellcee-rating__actions";
+
+    const stars = document.createElement("div");
+    stars.className = "wellcee-rating__stars";
+    stars.setAttribute("role", "radiogroup");
+    stars.setAttribute("aria-label", "给收藏房源评分");
+
+    for (let rating = 1; rating <= 5; rating += 1) {
+      const star = document.createElement("button");
+      star.type = "button";
+      star.className = "wellcee-rating__star";
+      star.dataset.rating = String(rating);
+      star.setAttribute("role", "radio");
+      star.setAttribute("aria-label", `${rating} 星`);
+      star.addEventListener("click", async () => {
+        const previousRating = Number(ratings[listingId]) || 0;
+        ratings = { ...ratings, [listingId]: rating };
+        syncRatingControl(control, listingId);
+        try {
+          await saveRating(listingId, rating);
+          syncRatingControl(control, listingId);
+        } catch (error) {
+          console.warn("[Wellcee Notes] 无法保存评分", error);
+          if (previousRating) {
+            ratings = { ...ratings, [listingId]: previousRating };
+          } else {
+            const nextRatings = { ...ratings };
+            delete nextRatings[listingId];
+            ratings = nextRatings;
+          }
+          syncRatingControl(control, listingId);
+        }
+      });
+      stars.appendChild(star);
+    }
+
+    const clearButton = document.createElement("button");
+    clearButton.type = "button";
+    clearButton.className = "wellcee-rating__clear";
+    clearButton.textContent = "清除";
+    clearButton.addEventListener("click", async () => {
+      const previousRating = Number(ratings[listingId]) || 0;
+      const nextRatings = { ...ratings };
+      delete nextRatings[listingId];
+      ratings = nextRatings;
+      syncRatingControl(control, listingId);
+      try {
+        await saveRating(listingId, 0);
+      } catch (error) {
+        console.warn("[Wellcee Notes] 无法清除评分", error);
+        if (previousRating) {
+          ratings = { ...ratings, [listingId]: previousRating };
+        }
+        syncRatingControl(control, listingId);
+      }
+    });
+
+    actions.append(stars, clearButton);
+    control.append(labelGroup, actions);
+    syncRatingControl(control, listingId);
+    return control;
+  }
+
   function createEditor(listingId) {
     const panel = document.createElement("section");
     panel.id = EDITOR_ID;
@@ -494,7 +645,7 @@
     updateCharacterCount(textarea, count);
 
     footer.append(privacy, count);
-    panel.append(header, textarea, footer);
+    panel.append(header, createRatingControl(listingId), textarea, footer);
 
     textarea.addEventListener("input", () => {
       updateCharacterCount(textarea, count);
@@ -588,6 +739,11 @@
       syncFavoriteButtons();
     }
 
+    if (changes[RATINGS_KEY]) {
+      ratings = changes[RATINGS_KEY].newValue || {};
+      syncDetailRatingControl();
+    }
+
     if (changes[NOTE_DETAILS_KEY]) {
       noteDetails = changes[NOTE_DETAILS_KEY].newValue || {};
     }
@@ -648,11 +804,13 @@
   Promise.all([
     getStoredRecord(STORAGE_KEY),
     getStoredRecord(NOTE_DETAILS_KEY),
-    getStoredRecord(FAVORITES_KEY)
-  ]).then(([storedNotes, storedNoteDetails, storedFavorites]) => {
+    getStoredRecord(FAVORITES_KEY),
+    getStoredRecord(RATINGS_KEY)
+  ]).then(([storedNotes, storedNoteDetails, storedFavorites, storedRatings]) => {
     notes = storedNotes;
     noteDetails = storedNoteDetails;
     favorites = storedFavorites;
+    ratings = storedRatings;
     storageReady = true;
     refreshPage();
   });

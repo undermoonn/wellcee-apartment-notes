@@ -41,6 +41,24 @@
       </button>
     </nav>
 
+    <div class="sort-bar" aria-label="列表排序">
+      <span class="sort-bar__label">排序</span>
+      <div class="sort-toggle" role="group" aria-label="选择排序方式">
+        <button
+          id="sort-default"
+          class="sort-toggle__button is-active"
+          type="button"
+          aria-pressed="true"
+        >默认</button>
+        <button
+          id="sort-rating"
+          class="sort-toggle__button"
+          type="button"
+          aria-pressed="false"
+        >评分</button>
+      </div>
+    </div>
+
     <main>
       <div id="view-track" class="view-track" data-view="favorites">
         <section
