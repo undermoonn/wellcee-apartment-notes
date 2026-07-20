@@ -1,4 +1,4 @@
 interface:
   display_name: "Wellcee 房源筛选与管理"
   short_description: "在 Chrome 中筛选、比较并管理 Wellcee 房源"
-  default_prompt: "使用 $browse-wellcee-listings 在 Chrome 中按我的条件筛选 Wellcee 房源，并记录笔记、收藏和评分。"
+  default_prompt: "使用 $browse-wellcee-listings 在 Chrome 中按我的条件筛选 Wellcee 房源。"
