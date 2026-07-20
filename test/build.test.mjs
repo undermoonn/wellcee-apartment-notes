@@ -7,11 +7,19 @@ const readProjectFile = (path) =>
 
 test("pins lit-html, TypeScript 7, and the current Rolldown release", async () => {
   const packageJson = JSON.parse(await readProjectFile("package.json"));
+  assert.equal(packageJson.license, "MIT");
   assert.equal(packageJson.dependencies["lit-html"], "3.3.3");
   assert.equal(packageJson.devDependencies.rolldown, "1.2.0");
   assert.equal(packageJson.devDependencies.typescript, "7.0.2");
   assert.match(packageJson.scripts.typecheck, /tsc --noEmit/);
   assert.match(packageJson.scripts.build, /rolldown -c/);
+});
+
+test("includes the MIT license in the distribution", async () => {
+  const license = await readProjectFile("dist/LICENSE");
+
+  assert.match(license, /^MIT License$/m);
+  assert.match(license, /Wellcee Apartment Notes contributors/);
 });
 
 test("extension pages use the bundled declarative UI", async () => {

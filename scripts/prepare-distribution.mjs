@@ -4,6 +4,7 @@ const projectRoot = new URL("../", import.meta.url);
 const distributionRoot = new URL("../dist/", import.meta.url);
 
 const distributionFiles = [
+  ["LICENSE", "LICENSE"],
   ["manifest.json", "manifest.json"],
   ["src/content.css", "content.css"],
   ["popup/popup.html", "popup/popup.html"],
