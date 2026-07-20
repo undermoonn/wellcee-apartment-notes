@@ -3,18 +3,17 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的 Wellcee 房源</title>
-    <link rel="stylesheet" href="popup.css">
+    <title>Wellcee 房源侧边栏</title>
+    <link rel="stylesheet" href="../popup/popup.css">
+    <link rel="stylesheet" href="sidepanel.css">
   </head>
-  <body data-surface="popup">
+  <body data-surface="sidepanel">
     <header class="header">
       <div>
         <span class="eyebrow">WELLCEE NOTES</span>
         <h1>我的房源</h1>
       </div>
-      <button id="open-side-panel" class="open-side-panel" type="button">
-        侧边栏
-      </button>
+      <p class="sidepanel-intro">收藏与私人笔记</p>
     </header>
 
     <nav class="view-tabs" role="tablist" aria-label="房源列表">
@@ -92,6 +91,7 @@
         收藏和笔记仅保存在当前 Chrome
       </span>
     </footer>
-    <script src="popup.js"></script>
+
+    <script src="../popup/popup.js"></script>
   </body>
 </html>

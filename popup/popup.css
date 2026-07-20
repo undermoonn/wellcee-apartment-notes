@@ -24,6 +24,8 @@ body {
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 20px;
   padding: 18px 20px 12px;
   background: #fff;
 }
@@ -42,6 +44,35 @@ h1 {
   color: #203231;
   font-size: 20px;
   line-height: 28px;
+}
+
+.open-side-panel {
+  flex: none;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid rgba(24, 140, 139, 0.28);
+  border-radius: 8px;
+  background: #f0fafa;
+  color: #157f7e;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.open-side-panel:hover {
+  border-color: #2db5b4;
+  background: #e4f5f4;
+}
+
+.open-side-panel:focus-visible {
+  outline: 2px solid #2db5b4;
+  outline-offset: 1px;
+}
+
+.open-side-panel:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .view-tabs {

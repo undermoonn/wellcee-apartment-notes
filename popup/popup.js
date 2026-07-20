@@ -21,12 +21,29 @@
   const noteEmptyState = document.getElementById("note-empty-state");
   const favoriteCount = document.getElementById("favorite-count");
   const noteCount = document.getElementById("note-count");
+  const openSidePanelButton = document.getElementById("open-side-panel");
   const exportButton = document.getElementById("export-data");
   const importButton = document.getElementById("import-data");
   const importFile = document.getElementById("import-file");
   const dataStatus = document.getElementById("data-status");
 
   let statusTimer = null;
+  const isPopupSurface = document.body.dataset.surface === "popup";
+
+  async function openListing(url) {
+    let opened = false;
+    try {
+      await chrome.tabs.create({ url });
+      opened = true;
+    } catch (error) {
+      console.warn("[Wellcee Notes] 无法打开房源", error);
+      setDataStatus("无法打开房源，请重试", "error");
+    } finally {
+      if (opened && isPopupSurface) {
+        window.close();
+      }
+    }
+  }
 
   function getStoredData() {
     return new Promise((resolve) => {
@@ -331,8 +348,7 @@
 
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      chrome.tabs.create({ url: favorite.url });
-      window.close();
+      openListing(favorite.url);
     });
 
     const removeButton = document.createElement("button");
@@ -375,8 +391,7 @@
     link.append(title, meta, noteText);
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      chrome.tabs.create({ url: link.href });
-      window.close();
+      openListing(link.href);
     });
 
     const favoriteButton = document.createElement("button");
@@ -456,6 +471,21 @@
 
   favoriteTab.addEventListener("click", () => selectView("favorites"));
   noteTab.addEventListener("click", () => selectView("notes"));
+  openSidePanelButton?.addEventListener("click", async () => {
+    openSidePanelButton.disabled = true;
+    try {
+      const currentWindow = await chrome.windows.getCurrent();
+      if (currentWindow.id === undefined) {
+        throw new Error("无法获取当前 Chrome 窗口");
+      }
+      await chrome.sidePanel.open({ windowId: currentWindow.id });
+      window.close();
+    } catch (error) {
+      console.warn("[Wellcee Notes] 无法打开侧边栏", error);
+      openSidePanelButton.disabled = false;
+      setDataStatus("无法打开侧边栏，请重试", "error");
+    }
+  });
   exportButton.addEventListener("click", exportData);
   importButton.addEventListener("click", () => importFile.click());
   importFile.addEventListener("change", async () => {

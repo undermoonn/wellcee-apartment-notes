@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "在 Wellcee 房源上记录私人笔记、添加收藏，并从扩展图标快速查看收藏和有笔记的房源。",
   "permissions": [
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "icons": {
     "16": "assets/icons/icon-16.png",
@@ -19,6 +20,9 @@
       "16": "assets/icons/icon-16.png",
       "32": "assets/icons/icon-32.png"
     }
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
   },
   "content_scripts": [
     {
