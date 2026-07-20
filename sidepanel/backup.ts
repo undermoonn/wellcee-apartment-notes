@@ -1,3 +1,4 @@
+// Import and export validation for the side panel's local backups.
 import { MAX_NOTE_LENGTH, WELLCEE_ORIGIN } from "../src/constants.js";
 import type {
   ImportedBackupData,

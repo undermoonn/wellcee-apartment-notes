@@ -9,12 +9,15 @@ import {
 } from "./backup.js";
 import {
   ACTIVE_LISTING_REQUEST,
+  BROWSE_CURSOR_KEY,
   FAVORITES_KEY,
   LISTING_CHANGED_MESSAGE,
   NOTES_KEY,
   NOTE_DETAILS_KEY,
   OPEN_IN_NEW_TAB_KEY,
   RATINGS_KEY,
+  SORT_MODE_KEY,
+  VIEW_MODE_KEY,
   WELLCEE_ORIGIN
 } from "../src/constants.js";
 import {
@@ -29,15 +32,16 @@ import {
   createUpdateErrorState
 } from "./update-check.js";
 import type { UpdateCheckState } from "./update-check.js";
-import { appTemplate } from "./view.js";
+import { sidePanelTemplate } from "./view.js";
 import type {
   DataStatus,
   DataStatusState,
-  PopupViewActions,
+  SidePanelViewActions,
   SortMode,
   ViewMode
 } from "./view.js";
 import type {
+  BrowseCursor,
   ImportSummary,
   ListingId,
   ListingSummary,
@@ -45,30 +49,69 @@ import type {
 } from "../src/types.js";
 
 const IDLE_STATUS = "收藏和笔记仅保存在当前 Chrome";
+const RESTORED_CURSOR_TOP_OFFSET = 12;
 
 const appRootElement = document.getElementById("app");
 if (!appRootElement) {
   throw new Error("Wellcee Notes app mount is missing");
 }
 const appRoot: HTMLElement = appRootElement;
-const isPopupSurface = document.body.dataset.surface === "popup";
 
 let statusTimer: number | undefined;
 let activeTabId: number | null = null;
 let activeListingId: ListingId | null = null;
 let activeListingRequest = 0;
+let browseCursor: BrowseCursor | null = null;
 let dataRequest = 0;
 let updateRequest = 0;
+let uiStateRestored = false;
 let viewMode: ViewMode = "favorites";
 let sortMode: SortMode = "default";
 let openInNewTab = true;
 let openModeBusy = false;
-let sidePanelBusy = false;
 let dataActionsBusy = false;
 let storedData: WellceeStorageData = createStorageDefaults();
 let dataStatus: DataStatus = { message: IDLE_STATUS, state: "idle" };
 let updateCheck: UpdateCheckState = createInitialUpdateState();
 const busyListings = new Set<ListingId>();
+
+function normalizedViewMode(value: unknown): ViewMode {
+  return value === "notes" ? "notes" : "favorites";
+}
+
+function normalizedSortMode(value: unknown): SortMode {
+  return value === "rating" ? "rating" : "default";
+}
+
+function normalizedBrowseCursor(value: unknown): BrowseCursor | null {
+  if (
+    !isPlainRecord(value) ||
+    typeof value.listingId !== "string" ||
+    !/^\d+$/.test(value.listingId) ||
+    !Number.isInteger(value.position) ||
+    Number(value.position) < 0 ||
+    (value.view !== "favorites" && value.view !== "notes")
+  ) {
+    return null;
+  }
+
+  return {
+    listingId: value.listingId,
+    position: Number(value.position),
+    view: value.view
+  };
+}
+
+async function persistUiState(
+  value: Partial<WellceeStorageData>
+): Promise<void> {
+  try {
+    await setStoredData(value);
+  } catch (error) {
+    console.warn("[Wellcee Notes] 无法保存列表状态", error);
+    setDataStatus("无法保存列表状态，请重试", "error");
+  }
+}
 
 async function refreshData(): Promise<void> {
   const request = ++dataRequest;
@@ -78,7 +121,103 @@ async function refreshData(): Promise<void> {
   }
   storedData = result;
   openInNewTab = result[OPEN_IN_NEW_TAB_KEY] !== false;
+  if (!uiStateRestored) {
+    viewMode = normalizedViewMode(result[VIEW_MODE_KEY]);
+    sortMode = normalizedSortMode(result[SORT_MODE_KEY]);
+    browseCursor = normalizedBrowseCursor(result[BROWSE_CURSOR_KEY]);
+    uiStateRestored = true;
+  }
   renderApp();
+  if (
+    activeListingId !== null &&
+    browseCursor?.listingId !== activeListingId
+  ) {
+    void rememberBrowseCursor(activeListingId);
+    renderApp();
+  }
+}
+
+function rememberBrowseCursor(listingId: ListingId): Promise<void> {
+  const panelId = viewMode === "favorites" ? "favorite-panel" : "note-panel";
+  const panel = appRoot.querySelector<HTMLElement>(`#${panelId}`);
+  if (!panel) {
+    return Promise.resolve();
+  }
+
+  const items = Array.from(
+    panel.querySelectorAll<HTMLElement>(".favorite-item")
+  );
+  const position = items.findIndex(
+    (item) => item.dataset.listingId === listingId
+  );
+  if (position >= 0) {
+    browseCursor = { listingId, position, view: viewMode };
+    return persistUiState({ [BROWSE_CURSOR_KEY]: browseCursor });
+  }
+  return Promise.resolve();
+}
+
+function updateActiveVisibility(panel: HTMLElement): void {
+  panel
+    .querySelectorAll<HTMLElement>("[data-sticky-position]")
+    .forEach((item) => item.removeAttribute("data-sticky-position"));
+  const activeItem = panel.querySelector<HTMLElement>(
+    ".favorite-item--current"
+  );
+  if (!activeItem) {
+    return;
+  }
+
+  const panelBounds = panel.getBoundingClientRect();
+  const itemBounds = activeItem.getBoundingClientRect();
+  if (itemBounds.top < panelBounds.top) {
+    activeItem.dataset.stickyPosition = "above";
+  } else if (itemBounds.bottom > panelBounds.bottom) {
+    activeItem.dataset.stickyPosition = "below";
+  }
+}
+
+function updateVisibleActiveVisibility(): void {
+  const panelId = viewMode === "favorites" ? "favorite-panel" : "note-panel";
+  const panel = appRoot.querySelector<HTMLElement>(`#${panelId}`);
+  if (panel) {
+    updateActiveVisibility(panel);
+  }
+}
+
+function restoreActiveScrollPosition(): void {
+  const panelId = viewMode === "favorites" ? "favorite-panel" : "note-panel";
+  const panel = appRoot.querySelector<HTMLElement>(`#${panelId}`);
+  if (!panel) {
+    return;
+  }
+
+  const listingIds = [activeListingId, browseCursor?.listingId].filter(
+    (listingId): listingId is ListingId =>
+      listingId !== null && listingId !== undefined
+  );
+  const items = Array.from(
+    panel.querySelectorAll<HTMLElement>(".favorite-item")
+  );
+  const anchorItem = listingIds
+    .map((listingId) =>
+      items.find((item) => item.dataset.listingId === listingId)
+    )
+    .find((item) => item !== undefined);
+  if (!anchorItem) {
+    return;
+  }
+
+  anchorItem.removeAttribute("data-sticky-position");
+  const panelBounds = panel.getBoundingClientRect();
+  const itemBounds = anchorItem.getBoundingClientRect();
+  panel.scrollTop +=
+    itemBounds.top - panelBounds.top - RESTORED_CURSOR_TOP_OFFSET;
+  updateActiveVisibility(panel);
+}
+
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 async function refreshActiveListing(): Promise<void> {
@@ -109,15 +248,27 @@ async function refreshActiveListing(): Promise<void> {
   }
 
   if (request === activeListingRequest) {
+    if (
+      nextListingId !== null &&
+      browseCursor?.listingId !== nextListingId
+    ) {
+      void rememberBrowseCursor(nextListingId);
+    }
     activeTabId = nextTabId;
     activeListingId = nextListingId;
     renderApp();
   }
 }
 
-async function openListing(url: string): Promise<void> {
-  let opened = false;
+async function openListing(
+  listingId: ListingId,
+  url: string
+): Promise<void> {
+  const previousBrowseCursor = browseCursor;
+  const cursorPersistence = rememberBrowseCursor(listingId);
+  renderApp();
   try {
+    await cursorPersistence;
     if (openInNewTab) {
       await chrome.tabs.create({ url });
     } else {
@@ -130,14 +281,11 @@ async function openListing(url: string): Promise<void> {
       }
       await chrome.tabs.update(activeTab.id, { url });
     }
-    opened = true;
   } catch (error) {
     console.warn("[Wellcee Notes] 无法打开房源", error);
+    browseCursor = previousBrowseCursor;
+    void persistUiState({ [BROWSE_CURSOR_KEY]: browseCursor });
     setDataStatus("无法打开房源，请重试", "error");
-  } finally {
-    if (opened && isPopupSurface) {
-      window.close();
-    }
   }
 }
 
@@ -164,9 +312,6 @@ async function refreshUpdateCheck(force = false): Promise<void> {
 async function openRelease(url: string): Promise<void> {
   try {
     await chrome.tabs.create({ url });
-    if (isPopupSurface) {
-      window.close();
-    }
   } catch (error) {
     console.warn("[Wellcee Notes] 无法打开 Release 页面", error);
     setDataStatus("无法打开更新页面，请重试", "error");
@@ -338,11 +483,13 @@ async function runListingAction(
 function selectView(view: ViewMode): void {
   viewMode = view === "notes" ? "notes" : "favorites";
   renderApp();
+  void persistUiState({ [VIEW_MODE_KEY]: viewMode });
 }
 
 function selectSortMode(mode: SortMode): void {
   sortMode = mode === "rating" ? "rating" : "default";
   renderApp();
+  void persistUiState({ [SORT_MODE_KEY]: sortMode });
 }
 
 async function changeOpenMode(event: Event): Promise<void> {
@@ -359,23 +506,6 @@ async function changeOpenMode(event: Event): Promise<void> {
   } finally {
     openModeBusy = false;
     renderApp();
-  }
-}
-
-async function openSidePanel(): Promise<void> {
-  sidePanelBusy = true;
-  renderApp();
-  try {
-    const currentWindow = await chrome.windows.getCurrent();
-    if (currentWindow.id === undefined) {
-      throw new Error("无法获取当前 Chrome 窗口");
-    }
-    await chrome.sidePanel.open({ windowId: currentWindow.id });
-    window.close();
-  } catch (error) {
-    console.warn("[Wellcee Notes] 无法打开侧边栏", error);
-    sidePanelBusy = false;
-    setDataStatus("无法打开侧边栏，请重试", "error");
   }
 }
 
@@ -403,43 +533,44 @@ async function handleImport(event: Event): Promise<void> {
     setDataActionsBusy(false);
   }
 }
-const viewActions: PopupViewActions = {
+const sidePanelActions: SidePanelViewActions = {
   changeOpenMode: (event) => void changeOpenMode(event),
   exportData: () => void exportData(),
   handleImport: (event) => void handleImport(event),
-  openListing: (url) => void openListing(url),
+  openListing: (listingId, url) => void openListing(listingId, url),
   openRelease: (url) => void openRelease(url),
-  openSidePanel: () => void openSidePanel(),
   refreshUpdateCheck: () => void refreshUpdateCheck(true),
   removeFavorite: (listingId) =>
     void runListingAction(listingId, () => removeFavorite(listingId)),
   selectSortMode,
   selectView,
   toggleFavorite: (listingId, listing) =>
-    void runListingAction(listingId, () => toggleFavorite(listingId, listing))
+    void runListingAction(listingId, () => toggleFavorite(listingId, listing)),
+  updateActiveVisibility: (event) =>
+    updateActiveVisibility(event.currentTarget as HTMLElement)
 };
 
 function renderApp(): void {
   renderTemplate(
-    appTemplate(
+    sidePanelTemplate(
       {
         activeListingId,
+        browseCursor,
         busyListings,
         dataActionsBusy,
         dataStatus,
-        isPopupSurface,
         openInNewTab,
         openModeBusy,
-        sidePanelBusy,
         sortMode,
         storedData,
         updateCheck,
         viewMode
       },
-      viewActions
+      sidePanelActions
     ),
     appRoot
   );
+  updateVisibleActiveVisibility();
 }
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -448,6 +579,20 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
   if (changes[OPEN_IN_NEW_TAB_KEY]) {
     openInNewTab = changes[OPEN_IN_NEW_TAB_KEY].newValue !== false;
+    renderApp();
+  }
+  if (changes[VIEW_MODE_KEY]) {
+    viewMode = normalizedViewMode(changes[VIEW_MODE_KEY].newValue);
+    renderApp();
+  }
+  if (changes[SORT_MODE_KEY]) {
+    sortMode = normalizedSortMode(changes[SORT_MODE_KEY].newValue);
+    renderApp();
+  }
+  if (changes[BROWSE_CURSOR_KEY]) {
+    browseCursor = normalizedBrowseCursor(
+      changes[BROWSE_CURSOR_KEY].newValue
+    );
     renderApp();
   }
   if (
@@ -476,11 +621,21 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     refreshActiveListing();
   }
 });
+window.addEventListener("resize", updateVisibleActiveVisibility);
 
-renderApp();
-refreshData().catch((error) => {
-  console.warn("[Wellcee Notes] 无法读取本地数据", error);
-  setDataStatus("无法读取本地数据，请重试", "error");
-});
-refreshActiveListing();
-void refreshUpdateCheck();
+async function initialize(): Promise<void> {
+  try {
+    await refreshData();
+  } catch (error) {
+    console.warn("[Wellcee Notes] 无法读取本地数据", error);
+    uiStateRestored = true;
+    renderApp();
+    setDataStatus("无法读取本地数据，请重试", "error");
+  }
+  await refreshActiveListing();
+  await nextAnimationFrame();
+  restoreActiveScrollPosition();
+  void refreshUpdateCheck();
+}
+
+void initialize();

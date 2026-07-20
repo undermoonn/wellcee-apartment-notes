@@ -1,4 +1,12 @@
 export type ListingId = string;
+export type ListingViewMode = "favorites" | "notes";
+export type ListingSortMode = "default" | "rating";
+
+export interface BrowseCursor {
+  listingId: ListingId;
+  position: number;
+  view: ListingViewMode;
+}
 
 export interface ListingSummary {
   id: ListingId;
@@ -25,6 +33,9 @@ export interface WellceeStorageData {
   wellceeApartmentNoteDetails: NoteDetailsById;
   wellceeApartmentRatings: Ratings;
   wellceeOpenListingsInNewTab: boolean;
+  wellceeListingsViewMode: ListingViewMode;
+  wellceeListingsSortMode: ListingSortMode;
+  wellceeListingsBrowseCursor: BrowseCursor | null;
 }
 
 export interface ImportedBackupData {

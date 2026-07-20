@@ -1,3 +1,4 @@
+// Release status shown in the side panel header.
 const LATEST_RELEASE_API =
   "https://api.github.com/repos/undermoonn/wellcee-apartment-notes/releases/latest";
 const RELEASE_URL_PREFIX =

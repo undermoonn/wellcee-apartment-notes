@@ -22,31 +22,33 @@ test("includes the MIT license in the distribution", async () => {
   assert.match(license, /Wellcee Apartment Notes contributors/);
 });
 
-test("extension pages use the bundled declarative UI", async () => {
-  const [popupHtml, sidepanelHtml, popupSource, popupView] = await Promise.all([
-    readProjectFile("dist/popup/popup.html"),
+test("the side panel uses the bundled declarative UI", async () => {
+  const [sidepanelHtml, sidepanelSource, sidepanelView] = await Promise.all([
     readProjectFile("dist/sidepanel/sidepanel.html"),
-    readProjectFile("popup/popup.ts"),
-    readProjectFile("popup/view.ts")
+    readProjectFile("sidepanel/sidepanel.ts"),
+    readProjectFile("sidepanel/view.ts")
   ]);
 
-  assert.match(popupHtml, /<div id="app"><\/div>/);
-  assert.match(popupHtml, /src="\.\.\/popup\.js"/);
-  assert.match(sidepanelHtml, /src="\.\.\/popup\.js"/);
-  assert.match(popupSource, /from "lit-html"/);
-  assert.match(popupSource, /from "\.\/view\.js"/);
-  assert.match(popupSource, /renderTemplate\(\s*appTemplate\(/);
-  assert.match(popupView, /export function appTemplate/);
+  assert.match(sidepanelHtml, /<div id="app"><\/div>/);
+  assert.match(sidepanelHtml, /src="\.\.\/sidepanel\.js"/);
+  assert.match(sidepanelSource, /from "lit-html"/);
+  assert.match(sidepanelSource, /from "\.\/view\.js"/);
+  assert.match(sidepanelSource, /renderTemplate\(\s*sidePanelTemplate\(/);
+  assert.match(sidepanelView, /export function sidePanelTemplate/);
 });
 
 test("Rolldown outputs self-contained classic scripts", async () => {
-  const [contentBundle, popupBundle] = await Promise.all([
+  const [contentBundle, sidepanelBundle, backgroundBundle] = await Promise.all([
     readProjectFile("dist/content.js"),
-    readProjectFile("dist/popup.js")
+    readProjectFile("dist/sidepanel.js"),
+    readProjectFile("dist/background.js")
   ]);
 
-  for (const bundle of [contentBundle, popupBundle]) {
+  for (const bundle of [contentBundle, sidepanelBundle, backgroundBundle]) {
     assert.doesNotMatch(bundle, /^\s*import\s/m);
+  }
+  for (const bundle of [contentBundle, sidepanelBundle]) {
     assert.match(bundle, /\$lit\$/);
   }
+  assert.match(backgroundBundle, /openPanelOnActionClick/);
 });

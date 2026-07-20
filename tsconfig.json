@@ -16,7 +16,7 @@
   },
   "include": [
     "src/**/*.ts",
-    "popup/**/*.ts",
+    "sidepanel/**/*.ts",
     "rolldown.config.ts"
   ]
 }

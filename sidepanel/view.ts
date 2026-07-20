@@ -7,6 +7,7 @@ import {
   WELLCEE_ORIGIN
 } from "../src/constants.js";
 import type {
+  BrowseCursor,
   FavoriteListing,
   Favorites,
   ListingId,
@@ -25,28 +26,26 @@ export interface DataStatus {
   state: DataStatusState;
 }
 
-export interface PopupViewState {
+export interface SidePanelViewState {
   activeListingId: ListingId | null;
+  browseCursor: BrowseCursor | null;
   busyListings: ReadonlySet<ListingId>;
   dataActionsBusy: boolean;
   dataStatus: DataStatus;
-  isPopupSurface: boolean;
   openInNewTab: boolean;
   openModeBusy: boolean;
-  sidePanelBusy: boolean;
   sortMode: SortMode;
   storedData: WellceeStorageData;
   updateCheck: UpdateCheckState;
   viewMode: ViewMode;
 }
 
-export interface PopupViewActions {
+export interface SidePanelViewActions {
   changeOpenMode(event: Event): void;
   exportData(): void;
   handleImport(event: Event): void;
-  openListing(url: string): void;
+  openListing(listingId: ListingId, url: string): void;
   openRelease(url: string): void;
-  openSidePanel(): void;
   refreshUpdateCheck(): void;
   removeFavorite(listingId: ListingId): void;
   selectSortMode(mode: SortMode): void;
@@ -55,9 +54,10 @@ export interface PopupViewActions {
     listingId: ListingId,
     listing: ListingSummary | undefined
   ): void;
+  updateActiveVisibility(event: Event): void;
 }
 
-function getViewModel(state: PopupViewState) {
+function getViewModel(state: SidePanelViewState) {
   const { sortMode, storedData } = state;
   const ratings = storedData[RATINGS_KEY] || {};
   const defaultFavoriteOrder = (
@@ -138,15 +138,16 @@ function favoriteItemTemplate(
   favorite: FavoriteListing,
   note: string | undefined,
   rating: number,
-  state: PopupViewState,
-  actions: PopupViewActions
+  hasBrowseBoundary: boolean,
+  state: SidePanelViewState,
+  actions: SidePanelViewActions
 ) {
   const listingId = String(favorite.id);
   const isCurrent = listingId === state.activeListingId;
   const title = favorite.title || `Wellcee 房源 ${favorite.id}`;
   return html`
     <article
-      class=${`favorite-item${isCurrent ? " favorite-item--current" : ""}`}
+      class=${`favorite-item${isCurrent ? " favorite-item--current" : ""}${hasBrowseBoundary ? " favorite-item--browse-boundary" : ""}`}
       data-listing-id=${listingId}
     >
       <a
@@ -155,7 +156,7 @@ function favoriteItemTemplate(
         title="打开房源"
         @click=${(event: MouseEvent) => {
           event.preventDefault();
-          actions.openListing(favorite.url);
+          actions.openListing(listingId, favorite.url);
         }}
       >
         ${currentListingTemplate(listingId, state.activeListingId)}
@@ -186,8 +187,9 @@ function noteItemTemplate(
   details: NoteDetails | undefined,
   favorite: FavoriteListing | undefined,
   rating: number,
-  state: PopupViewState,
-  actions: PopupViewActions
+  hasBrowseBoundary: boolean,
+  state: SidePanelViewState,
+  actions: SidePanelViewActions
 ) {
   const listing = details || favorite;
   const url = listing?.url || `${WELLCEE_ORIGIN}/rent-apartment/${listingId}`;
@@ -196,7 +198,7 @@ function noteItemTemplate(
   const isCurrent = String(listingId) === state.activeListingId;
   return html`
     <article
-      class=${`favorite-item favorite-item--note${isCurrent ? " favorite-item--current" : ""}`}
+      class=${`favorite-item favorite-item--note${isCurrent ? " favorite-item--current" : ""}${hasBrowseBoundary ? " favorite-item--browse-boundary" : ""}`}
       data-listing-id=${String(listingId)}
     >
       <a
@@ -205,7 +207,7 @@ function noteItemTemplate(
         title="打开房源"
         @click=${(event: MouseEvent) => {
           event.preventDefault();
-          actions.openListing(url);
+          actions.openListing(listingId, url);
         }}
       >
         ${currentListingTemplate(listingId, state.activeListingId)}
@@ -247,14 +249,28 @@ function emptyStateTemplate(type: "favorite" | "note") {
   `;
 }
 
-export function appTemplate(
-  state: PopupViewState,
-  actions: PopupViewActions
+export function sidePanelTemplate(
+  state: SidePanelViewState,
+  actions: SidePanelViewActions
 ) {
   const { favorites, favoritesById, notes, noteDetails, noteEntries, ratings } =
     getViewModel(state);
   const showFavorites = state.viewMode === "favorites";
   const sortByRating = state.sortMode === "rating";
+  const favoriteCursorPosition =
+    state.browseCursor?.view === "favorites"
+      ? state.browseCursor.position
+      : null;
+  const noteCursorPosition =
+    state.browseCursor?.view === "notes" ? state.browseCursor.position : null;
+  const favoriteBoundaryIndex =
+    favoriteCursorPosition === null || favorites.length === 0
+      ? -1
+      : Math.min(favoriteCursorPosition - 1, favorites.length - 1);
+  const noteBoundaryIndex =
+    noteCursorPosition === null || noteEntries.length === 0
+      ? -1
+      : Math.min(noteCursorPosition - 1, noteEntries.length - 1);
 
   return html`
     <header class="header">
@@ -296,17 +312,6 @@ export function appTemplate(
                     : "检查更新"}</button>
               `}
         </div>
-        ${state.isPopupSurface
-          ? html`
-              <button
-                id="open-side-panel"
-                class="open-side-panel"
-                type="button"
-                ?disabled=${state.sidePanelBusy}
-                @click=${actions.openSidePanel}
-              >侧边栏</button>
-            `
-          : nothing}
       </div>
     </header>
 
@@ -387,15 +392,20 @@ export function appTemplate(
           aria-labelledby="favorite-tab"
           aria-hidden=${String(!showFavorites)}
           ?inert=${!showFavorites}
+          @scroll=${actions.updateActiveVisibility}
         >
           ${favorites.length
             ? html`
-                <div class="listing-list" aria-live="polite">
-                  ${favorites.map((favorite) =>
+                <div
+                  class=${`listing-list${favoriteCursorPosition === 0 ? " listing-list--browse-boundary-start" : ""}`}
+                  aria-live="polite"
+                >
+                  ${favorites.map((favorite, index) =>
                     favoriteItemTemplate(
                       favorite,
                       notes[favorite.id],
                       ratings[favorite.id] ?? 0,
+                      index === favoriteBoundaryIndex,
                       state,
                       actions
                     )
@@ -412,17 +422,22 @@ export function appTemplate(
           aria-labelledby="note-tab"
           aria-hidden=${String(showFavorites)}
           ?inert=${showFavorites}
+          @scroll=${actions.updateActiveVisibility}
         >
           ${noteEntries.length
             ? html`
-                <div class="listing-list" aria-live="polite">
-                  ${noteEntries.map(([listingId, note]) =>
+                <div
+                  class=${`listing-list${noteCursorPosition === 0 ? " listing-list--browse-boundary-start" : ""}`}
+                  aria-live="polite"
+                >
+                  ${noteEntries.map(([listingId, note], index) =>
                     noteItemTemplate(
                       listingId,
                       note,
                       noteDetails[listingId],
                       favoritesById[listingId],
                       favoritesById[listingId] ? ratings[listingId] ?? 0 : 0,
+                      index === noteBoundaryIndex,
                       state,
                       actions
                     )

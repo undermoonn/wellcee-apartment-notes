@@ -1,9 +1,12 @@
 import {
+  BROWSE_CURSOR_KEY,
   FAVORITES_KEY,
   NOTES_KEY,
   NOTE_DETAILS_KEY,
   OPEN_IN_NEW_TAB_KEY,
-  RATINGS_KEY
+  RATINGS_KEY,
+  SORT_MODE_KEY,
+  VIEW_MODE_KEY
 } from "./constants.js";
 import type { WellceeStorageData } from "./types.js";
 
@@ -13,7 +16,10 @@ export function createStorageDefaults(): WellceeStorageData {
     [NOTES_KEY]: {},
     [NOTE_DETAILS_KEY]: {},
     [RATINGS_KEY]: {},
-    [OPEN_IN_NEW_TAB_KEY]: true
+    [OPEN_IN_NEW_TAB_KEY]: true,
+    [VIEW_MODE_KEY]: "favorites",
+    [SORT_MODE_KEY]: "default",
+    [BROWSE_CURSOR_KEY]: null
   };
 }
 

@@ -13,8 +13,9 @@ test("uses Manifest V3 and local storage", () => {
   assert.ok(manifest.permissions.includes("sidePanel"));
   assert.ok(!manifest.permissions.includes("tabs"));
   assert.deepEqual(manifest.host_permissions, ["https://api.github.com/*"]);
-  assert.equal(manifest.action.default_popup, "popup/popup.html");
+  assert.equal(manifest.action.default_popup, undefined);
   assert.equal(manifest.side_panel.default_path, "sidepanel/sidepanel.html");
+  assert.equal(manifest.background.service_worker, "background.js");
 });
 
 test("runs only on Wellcee web pages", () => {
@@ -34,11 +35,11 @@ test("dist is a self-contained loadable extension directory", async () => {
   const contentScript = distributedManifest.content_scripts[0];
   const paths = [
     ...Object.values(distributedManifest.icons),
-    distributedManifest.action.default_popup,
     ...contentScript.js,
     ...contentScript.css,
-    "popup.js",
-    "popup/popup.css",
+    distributedManifest.background.service_worker,
+    "sidepanel.js",
+    "sidepanel/base.css",
     distributedManifest.side_panel.default_path,
     "sidepanel/sidepanel.css"
   ];
@@ -46,7 +47,6 @@ test("dist is a self-contained loadable extension directory", async () => {
   await Promise.all(paths.map((path) => access(new URL(path, distributionRootUrl))));
 
   const extensionPages = [
-    new URL(distributedManifest.action.default_popup, distributionRootUrl),
     new URL(distributedManifest.side_panel.default_path, distributionRootUrl)
   ];
   for (const pageUrl of extensionPages) {

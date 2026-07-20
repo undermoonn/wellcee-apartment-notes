@@ -19,11 +19,19 @@ export default defineConfig([
     }
   },
   {
-    input: "popup/popup.ts",
+    input: "src/background.ts",
     platform: "browser",
     output: {
       ...sharedOutput,
-      file: "dist/popup.js"
+      file: "dist/background.js"
+    }
+  },
+  {
+    input: "sidepanel/sidepanel.ts",
+    platform: "browser",
+    output: {
+      ...sharedOutput,
+      file: "dist/sidepanel.js"
     }
   }
 ]);

@@ -49,10 +49,9 @@ Skill 需要：
 | --- | --- |
 | 房源详情页 | 记录最多 2,000 字的私人笔记，内容自动保存；收藏房源，并为已收藏房源设置 1–5 星评分 |
 | 房源列表页 | 直接收藏房源；在卡片上查看笔记摘要，悬停可展开完整内容 |
-| 扩展弹窗 | 集中查看收藏和有笔记的房源，按时间或评分排序，并突出显示当前正在浏览的房源 |
-| Chrome 侧边栏 | 浏览过程中持续打开完整房源列表，无需反复唤起弹窗 |
+| Chrome 侧边栏 | 集中查看收藏和有笔记的房源，按时间或评分排序，并持续突出显示当前正在浏览的房源 |
 | 数据管理 | 将笔记、房源标题、收藏和评分导出为 JSON，或从备份文件合并导入 |
-| 版本更新 | 打开弹窗或侧边栏时自动检查最新 GitHub Release，发现新版本后提供下载入口 |
+| 版本更新 | 打开侧边栏时自动检查最新 GitHub Release，发现新版本后提供下载入口 |
 
 扩展也会在再次打开房源详情时更新已保存的标题，并记住使用当前标签页还是新标签页打开房源的偏好。
 
@@ -104,7 +103,6 @@ pnpm build
 - 在「收藏」和「有笔记」两个列表之间切换；
 - 按默认顺序或评分从高到低排列；
 - 选择在当前标签页或新标签页打开房源；
-- 打开常驻的 Chrome 侧边栏；
 - 导出或导入本地数据。
 
 默认排序下，收藏按收藏时间、笔记按更新时间从新到旧排列。
@@ -123,7 +121,7 @@ pnpm build
 | 权限 | 用途 |
 | --- | --- |
 | `storage` | 在当前 Chrome 中保存笔记、收藏、评分和设置 |
-| `sidePanel` | 从扩展弹窗打开 Chrome 原生侧边栏 |
+| `sidePanel` | 点击扩展图标时打开 Chrome 原生侧边栏 |
 | `https://api.github.com/*` | 读取本项目最新的公开 GitHub Release 版本 |
 
 ## 本地开发
@@ -136,7 +134,7 @@ pnpm install
 
 安装依赖时会启用仓库内的 `.githooks/pre-commit`。每次提交前会依次运行 `pnpm typecheck` 和 `pnpm test`，任一检查失败都会阻止提交。
 
-弹窗、侧边栏和注入 Wellcee 的控件都使用 TypeScript 7 与 `lit-html` 开发，并由 Rolldown 打包为 Manifest V3 可直接执行的 IIFE。构建会先清理 `dist/`，再生成包含清单、页面、样式、图标和脚本的独立扩展目录。不要直接编辑 `dist/` 中的文件：
+侧边栏和注入 Wellcee 的控件都使用 TypeScript 7 与 `lit-html` 开发，并由 Rolldown 打包为 Manifest V3 可直接执行的 IIFE。构建会先清理 `dist/`，再生成包含清单、页面、样式、图标和脚本的独立扩展目录。不要直接编辑 `dist/` 中的文件：
 
 ```bash
 pnpm build
@@ -154,7 +152,7 @@ pnpm typecheck
 pnpm test
 ```
 
-源码按职责拆分：`src/constants.ts`、`src/storage.ts` 和 `src/types.ts` 提供共享基础设施；`src/content.ts` 与 `popup/popup.ts` 是两个状态编排入口；对应的 lit-html 模板分别位于 `src/content-view.ts` 和 `popup/view.ts`；备份文件校验集中在 `popup/backup.ts`，版本检测集中在 `popup/update-check.ts`，Wellcee URL 与页面 DOM 解析集中在 `src/wellcee-page.ts`。
+源码按职责拆分：`src/constants.ts`、`src/storage.ts` 和 `src/types.ts` 提供共享基础设施；`src/content.ts` 与 `sidepanel/sidepanel.ts` 负责状态编排；对应的 lit-html 模板分别位于 `src/content-view.ts` 和 `sidepanel/view.ts`；备份文件校验集中在 `sidepanel/backup.ts`，版本检测集中在 `sidepanel/update-check.ts`，Wellcee URL 与页面 DOM 解析集中在 `src/wellcee-page.ts`。
 
 ## 发布
 
@@ -178,8 +176,7 @@ pnpm test
 ├── manifest.json          # Chrome 扩展清单
 ├── LICENSE                # MIT 开源许可证
 ├── src/                   # 注入 Wellcee 页面的源代码与样式
-├── popup/                 # 工具栏弹窗源代码与样式
-├── sidepanel/             # Chrome 侧边栏
+├── sidepanel/             # Chrome 侧边栏状态、模板、页面与样式
 ├── dist/                  # 可直接“加载已解压”的完整扩展分发目录
 ├── assets/icons/          # 扩展图标
 ├── .githooks/             # Git pre-commit 检查
@@ -198,7 +195,7 @@ pnpm test
 
 **重新安装后数据不见了？**
 
-数据属于原扩展安装的本地存储。卸载扩展通常会一并删除这些数据，重新安装前请先从弹窗导出备份。
+数据属于原扩展安装的本地存储。卸载扩展通常会一并删除这些数据，重新安装前请先从侧边栏导出备份。
 
 **Wellcee 页面更新后功能失效？**
 

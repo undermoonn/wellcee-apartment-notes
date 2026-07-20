@@ -6,7 +6,7 @@ const readProjectFile = (path) =>
   readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("checks the latest public GitHub Release with a local cache", async () => {
-  const source = await readProjectFile("popup/update-check.ts");
+  const source = await readProjectFile("sidepanel/update-check.ts");
 
   assert.match(
     source,
@@ -18,21 +18,21 @@ test("checks the latest public GitHub Release with a local cache", async () => {
 });
 
 test("automatically checks for updates and exposes update actions", async () => {
-  const [popupSource, popupView] = await Promise.all([
-    readProjectFile("popup/popup.ts"),
-    readProjectFile("popup/view.ts")
+  const [sidepanelSource, sidepanelView] = await Promise.all([
+    readProjectFile("sidepanel/sidepanel.ts"),
+    readProjectFile("sidepanel/view.ts")
   ]);
 
-  assert.match(popupSource, /void refreshUpdateCheck\(\)/);
-  assert.match(popupView, /state\.updateCheck\.status === "available"/);
-  assert.match(popupView, /actions\.refreshUpdateCheck/);
-  assert.match(popupView, /actions\.openRelease/);
-  assert.match(popupView, /state\.updateCheck\.currentVersion/);
+  assert.match(sidepanelSource, /void refreshUpdateCheck\(\)/);
+  assert.match(sidepanelView, /state\.updateCheck\.status === "available"/);
+  assert.match(sidepanelView, /actions\.refreshUpdateCheck/);
+  assert.match(sidepanelView, /actions\.openRelease/);
+  assert.match(sidepanelView, /state\.updateCheck\.currentVersion/);
 
-  const headerStart = popupView.indexOf('<header class="header">');
-  const headerEnd = popupView.indexOf("</header>", headerStart);
-  const updateCheck = popupView.indexOf('class="update-check"');
-  const footerStart = popupView.indexOf('<footer class="data-footer">');
+  const headerStart = sidepanelView.indexOf('<header class="header">');
+  const headerEnd = sidepanelView.indexOf("</header>", headerStart);
+  const updateCheck = sidepanelView.indexOf('class="update-check"');
+  const footerStart = sidepanelView.indexOf('<footer class="data-footer">');
 
   assert.ok(headerStart >= 0 && headerStart < updateCheck);
   assert.ok(updateCheck < headerEnd);
