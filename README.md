@@ -5,6 +5,20 @@
   <p><strong>TypeScript 7 · lit-html · Rolldown · Chrome Manifest V3</strong></p>
 </div>
 
+## 界面预览
+
+### 房源详情页与 Chrome 侧边栏
+
+<p align="center">
+  <img src="docs/screenshots/detail.png" width="1200" alt="Wellcee 房源详情页中的私人笔记与评分面板，以及 Chrome 侧边栏中的收藏房源列表">
+</p>
+
+### 房源列表页
+
+<p align="center">
+  <img src="docs/screenshots/list-card.png" width="900" alt="Wellcee 房源列表卡片中的收藏按钮与笔记摘要">
+</p>
+
 ## 为什么需要它
 
 看房时，价格、位置和装修之外，往往还有许多只对自己有意义的信息：联系进度、通勤感受、优缺点，或下一次要问房东的问题。
