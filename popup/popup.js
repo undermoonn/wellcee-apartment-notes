@@ -9,6 +9,8 @@
   const BACKUP_SCHEMA_VERSION = 1;
   const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
   const MAX_NOTE_LENGTH = 2000;
+  const ACTIVE_LISTING_REQUEST = "wellcee:get-active-listing";
+  const LISTING_CHANGED_MESSAGE = "wellcee:listing-changed";
 
   const favoriteTab = document.getElementById("favorite-tab");
   const noteTab = document.getElementById("note-tab");
@@ -28,7 +30,51 @@
   const dataStatus = document.getElementById("data-status");
 
   let statusTimer = null;
+  let activeTabId = null;
+  let activeListingId = null;
+  let activeListingRequest = 0;
+  let hasRendered = false;
   const isPopupSurface = document.body.dataset.surface === "popup";
+
+  async function refreshActiveListing() {
+    const request = ++activeListingRequest;
+    let nextTabId = null;
+    let nextListingId = null;
+
+    try {
+      const [activeTab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+      if (activeTab?.id !== undefined) {
+        nextTabId = activeTab.id;
+        const response = await chrome.tabs.sendMessage(activeTab.id, {
+          type: ACTIVE_LISTING_REQUEST
+        });
+        if (
+          typeof response?.listingId === "string" &&
+          /^\d+$/.test(response.listingId)
+        ) {
+          nextListingId = response.listingId;
+        }
+      }
+    } catch {
+      // Non-Wellcee tabs do not have the content script, so no item is active.
+    }
+
+    if (request !== activeListingRequest) {
+      return;
+    }
+
+    const didChange =
+      activeTabId !== nextTabId || activeListingId !== nextListingId;
+    activeTabId = nextTabId;
+    activeListingId = nextListingId;
+    if (didChange || !hasRendered) {
+      hasRendered = true;
+      await render();
+    }
+  }
 
   async function openListing(url) {
     let opened = false;
@@ -320,6 +366,18 @@
     });
   }
 
+  function appendCurrentListingStatus(item, link, listingId) {
+    if (String(listingId) !== activeListingId) {
+      return;
+    }
+
+    item.classList.add("favorite-item--current");
+    const status = document.createElement("span");
+    status.className = "favorite-item__current";
+    status.textContent = "当前标签";
+    link.appendChild(status);
+  }
+
   function createFavoriteItem(favorite, note) {
     const item = document.createElement("article");
     item.className = "favorite-item";
@@ -337,6 +395,7 @@
     meta.className = "favorite-item__meta";
     meta.textContent = `房源 #${favorite.id}`;
 
+    appendCurrentListingStatus(item, link, favorite.id);
     link.append(title, meta);
 
     if (note?.trim()) {
@@ -388,6 +447,7 @@
     noteText.className = "favorite-item__note";
     noteText.textContent = note;
 
+    appendCurrentListingStatus(item, link, listingId);
     link.append(title, meta, noteText);
     link.addEventListener("click", (event) => {
       event.preventDefault();
@@ -523,5 +583,24 @@
     }
   });
 
-  render();
+  chrome.tabs.onActivated.addListener(() => {
+    refreshActiveListing();
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (tabId === activeTabId && changeInfo.status === "complete") {
+      refreshActiveListing();
+    }
+  });
+
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (
+      message?.type === LISTING_CHANGED_MESSAGE &&
+      sender.tab?.id === activeTabId
+    ) {
+      refreshActiveListing();
+    }
+  });
+
+  refreshActiveListing();
 })();

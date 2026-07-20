@@ -8,6 +8,7 @@ test("uses Manifest V3 and local storage", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.ok(manifest.permissions.includes("storage"));
   assert.ok(manifest.permissions.includes("sidePanel"));
+  assert.ok(!manifest.permissions.includes("tabs"));
   assert.equal(manifest.action.default_popup, "popup/popup.html");
   assert.equal(manifest.side_panel.default_path, "sidepanel/sidepanel.html");
 });

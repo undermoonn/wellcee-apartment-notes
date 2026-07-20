@@ -14,6 +14,8 @@
   const FAVORITE_BUTTON_CLASS = "wellcee-favorite-button";
   const FAVORITE_ANCHOR_CLASS = "wellcee-favorite-anchor";
   const EDITOR_ID = "wellcee-note-editor";
+  const ACTIVE_LISTING_REQUEST = "wellcee:get-active-listing";
+  const LISTING_CHANGED_MESSAGE = "wellcee:listing-changed";
   const MAX_NOTE_LENGTH = 2000;
   const SAVE_DELAY_MS = 400;
 
@@ -53,6 +55,13 @@
 
   function currentListingId() {
     return listingIdFromPathname(window.location.pathname);
+  }
+
+  function notifyListingChanged() {
+    chrome.runtime.sendMessage(
+      { type: LISTING_CHANGED_MESSAGE },
+      () => void chrome.runtime.lastError
+    );
   }
 
   function getStoredRecord(key) {
@@ -602,6 +611,14 @@
     }
   });
 
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== ACTIVE_LISTING_REQUEST) {
+      return;
+    }
+
+    sendResponse({ listingId: currentListingId() });
+  });
+
   window.setInterval(() => {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
@@ -610,6 +627,7 @@
       removeListDecorations();
       document.getElementById(EDITOR_ID)?.remove();
       scheduleRefresh();
+      notifyListingChanged();
       return;
     }
 

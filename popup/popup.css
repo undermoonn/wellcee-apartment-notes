@@ -170,6 +170,15 @@ main {
   background: #fff;
 }
 
+.favorite-item--current {
+  background: #edf9f8;
+  box-shadow: inset 4px 0 #2db5b4;
+}
+
+.favorite-item--current .favorite-item__link:hover {
+  background: #e4f5f4;
+}
+
 .favorite-item__link {
   display: block;
   min-width: 0;
@@ -202,6 +211,21 @@ main {
   line-height: 20px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.favorite-item__current {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  margin-bottom: 5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #188c8b;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 16px;
+  letter-spacing: 0.03em;
 }
 
 .favorite-item__meta {
