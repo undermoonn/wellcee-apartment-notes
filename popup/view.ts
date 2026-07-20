@@ -281,7 +281,7 @@ export function appTemplate(
                   type="button"
                   @click=${() =>
                     actions.openRelease(state.updateCheck.releaseUrl || "")}
-                >更新 v${state.updateCheck.latestVersion}</button>
+                >更新</button>
               `
             : html`
                 <button
