@@ -104,33 +104,25 @@ function getViewModel(state: SidePanelViewState) {
 
 function ratingStatusTemplate(rating: number, isFavorite = true) {
   if (!isFavorite) {
-    return html`
-      <span class="favorite-item__rating favorite-item__rating--unavailable">
-        未收藏
-      </span>
-    `;
+    return nothing;
   }
-  if (rating) {
-    return html`
-      <span
-        class="favorite-item__rating"
-        data-rated="true"
-        aria-label=${`评分 ${rating} 星`}
-      >${rating}/5</span>
-    `;
-  }
-  return html`<span class="favorite-item__rating">未评分</span>`;
-}
-
-function currentListingTemplate(
-  listingId: ListingId,
-  activeListingId: ListingId | null
-) {
   return html`
     <span
-      class="favorite-item__current"
-      aria-hidden=${String(String(listingId) !== activeListingId)}
-    >当前浏览</span>
+      class="favorite-item__rating"
+      data-rated=${String(rating > 0)}
+      aria-label=${rating ? `评分 ${rating} 星` : "未评分"}
+    >
+      <strong class="favorite-item__rating-value">${rating}</strong>
+      <span class="favorite-item__rating-divider" aria-hidden="true"></span>
+      <span class="favorite-item__rating-scale">5</span>
+      <span class="favorite-item__rating-icon" aria-hidden="true"></span>
+    </span>
+  `;
+}
+
+function currentListingTemplate() {
+  return html`
+    <span class="favorite-item__current" aria-hidden="true"></span>
   `;
 }
 
@@ -150,33 +142,40 @@ function favoriteItemTemplate(
       class=${`favorite-item${isCurrent ? " favorite-item--current" : ""}${hasBrowseBoundary ? " favorite-item--browse-boundary" : ""}`}
       data-listing-id=${listingId}
     >
+      <div class="favorite-item__aside">
+        <button
+          class="favorite-item__remove"
+          type="button"
+          aria-label=${`取消收藏 ${title}`}
+          title="取消收藏"
+          ?disabled=${state.busyListings.has(listingId)}
+          @click=${() => actions.removeFavorite(listingId)}
+        ></button>
+        ${ratingStatusTemplate(rating)}
+      </div>
       <a
         class="favorite-item__link"
         href=${favorite.url}
         title="打开房源"
+        aria-current=${isCurrent ? "page" : nothing}
         @click=${(event: MouseEvent) => {
           event.preventDefault();
           actions.openListing(listingId, favorite.url);
         }}
       >
-        ${currentListingTemplate(listingId, state.activeListingId)}
+        ${currentListingTemplate()}
         <strong class="favorite-item__title">${title}</strong>
         <div class="favorite-item__meta-row">
           <span class="favorite-item__meta">房源 #${favorite.id}</span>
-          ${ratingStatusTemplate(rating)}
         </div>
         ${note?.trim()
-          ? html`<p class="favorite-item__note">${note}</p>`
+          ? html`
+              <p class="favorite-item__note">
+                <span class="favorite-item__note-text">${note}</span>
+              </p>
+            `
           : nothing}
       </a>
-      <button
-        class="favorite-item__remove"
-        type="button"
-        aria-label=${`取消收藏 ${title}`}
-        title="取消收藏"
-        ?disabled=${state.busyListings.has(listingId)}
-        @click=${() => actions.removeFavorite(listingId)}
-      ></button>
     </article>
   `;
 }
@@ -201,32 +200,37 @@ function noteItemTemplate(
       class=${`favorite-item favorite-item--note${isCurrent ? " favorite-item--current" : ""}${hasBrowseBoundary ? " favorite-item--browse-boundary" : ""}`}
       data-listing-id=${String(listingId)}
     >
+      <div class="favorite-item__aside">
+        <button
+          class="favorite-item__favorite-state"
+          type="button"
+          aria-pressed=${String(isFavorite)}
+          aria-label=${isFavorite ? `取消收藏 ${title}` : `收藏 ${title}`}
+          title=${isFavorite ? "取消收藏" : "收藏房源"}
+          ?disabled=${state.busyListings.has(String(listingId))}
+          @click=${() => actions.toggleFavorite(listingId, listing)}
+        ></button>
+        ${ratingStatusTemplate(rating, isFavorite)}
+      </div>
       <a
         class="favorite-item__link"
         href=${url}
         title="打开房源"
+        aria-current=${isCurrent ? "page" : nothing}
         @click=${(event: MouseEvent) => {
           event.preventDefault();
           actions.openListing(listingId, url);
         }}
       >
-        ${currentListingTemplate(listingId, state.activeListingId)}
+        ${currentListingTemplate()}
         <strong class="favorite-item__title">${title}</strong>
         <div class="favorite-item__meta-row">
           <span class="favorite-item__meta">房源 #${listingId}</span>
-          ${ratingStatusTemplate(rating, isFavorite)}
         </div>
-        <p class="favorite-item__note">${note}</p>
+        <p class="favorite-item__note">
+          <span class="favorite-item__note-text">${note}</span>
+        </p>
       </a>
-      <button
-        class="favorite-item__favorite-state"
-        type="button"
-        aria-pressed=${String(isFavorite)}
-        aria-label=${isFavorite ? `取消收藏 ${title}` : `收藏 ${title}`}
-        title=${isFavorite ? "取消收藏" : "收藏房源"}
-        ?disabled=${state.busyListings.has(String(listingId))}
-        @click=${() => actions.toggleFavorite(listingId, listing)}
-      ></button>
     </article>
   `;
 }

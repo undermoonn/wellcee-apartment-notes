@@ -17,12 +17,11 @@ body {
 }
 
 .favorite-item__link {
-  padding-left: 16px;
+  padding-left: 10px;
 }
 
-.favorite-item__remove,
-.favorite-item__favorite-state {
-  right: 12px;
+.favorite-item__aside {
+  margin-left: 12px;
 }
 
 .favorite-item--current[data-sticky-position] {

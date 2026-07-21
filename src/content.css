@@ -102,9 +102,9 @@
 }
 
 .wellcee-favorite-button[aria-pressed="true"] {
-  border-color: rgba(237, 106, 94, 0.28) !important;
-  background: #fff3ef !important;
-  color: #ed6a5e !important;
+  border-color: rgba(24, 140, 139, 0.28) !important;
+  background: #edf9f8 !important;
+  color: #188c8b !important;
 }
 
 .wellcee-favorite-button[aria-pressed="true"]::before {
@@ -119,8 +119,8 @@
 }
 
 .wellcee-favorite-button[aria-pressed="true"]:hover {
-  border-color: #ed6a5e !important;
-  background: #ffe9e3 !important;
+  border-color: #2db5b4 !important;
+  background: #e4f5f4 !important;
 }
 
 .wellcee-favorite-button:focus-visible {
