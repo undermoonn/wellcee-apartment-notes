@@ -1,5 +1,5 @@
 import { html, nothing } from "lit-html";
-import { findBrowseCursorIndex } from "../src/browse-cursor.js";
+import { getBrowseCursor } from "../src/browse-cursor.js";
 import {
   FAVORITES_KEY,
   NOTES_KEY,
@@ -8,7 +8,7 @@ import {
   WELLCEE_ORIGIN
 } from "../src/constants.js";
 import type {
-  BrowseCursor,
+  BrowseCursors,
   FavoriteListing,
   Favorites,
   ListingId,
@@ -29,7 +29,7 @@ export interface DataStatus {
 
 export interface SidePanelViewState {
   activeListingId: ListingId | null;
-  browseCursor: BrowseCursor | null;
+  browseCursors: BrowseCursors;
   busyListings: ReadonlySet<ListingId>;
   dataActionsBusy: boolean;
   dataStatus: DataStatus;
@@ -262,20 +262,28 @@ export function sidePanelTemplate(
     getViewModel(state);
   const showFavorites = state.viewMode === "favorites";
   const sortByRating = state.sortMode === "rating";
-  const favoriteCursorPosition = findBrowseCursorIndex(
-    state.browseCursor,
+  const favoriteCursorPosition = getBrowseCursor(
+    state.browseCursors,
     "favorites",
-    favorites.map((favorite) => String(favorite.id))
-  );
-  const noteCursorPosition = findBrowseCursorIndex(
-    state.browseCursor,
+    state.sortMode
+  )?.position;
+  const noteCursorPosition = getBrowseCursor(
+    state.browseCursors,
     "notes",
-    noteEntries.map(([listingId]) => listingId)
-  );
+    state.sortMode
+  )?.position;
   const favoriteBoundaryIndex =
-    favoriteCursorPosition === null ? -1 : favoriteCursorPosition - 1;
+    favoriteCursorPosition === null ||
+    favoriteCursorPosition === undefined ||
+    favorites.length === 0
+      ? -1
+      : Math.min(favoriteCursorPosition - 1, favorites.length - 1);
   const noteBoundaryIndex =
-    noteCursorPosition === null ? -1 : noteCursorPosition - 1;
+    noteCursorPosition === null ||
+    noteCursorPosition === undefined ||
+    noteEntries.length === 0
+      ? -1
+      : Math.min(noteCursorPosition - 1, noteEntries.length - 1);
 
   return html`
     <header class="header">

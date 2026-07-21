@@ -1,11 +1,20 @@
 export type ListingId = string;
 export type ListingViewMode = "favorites" | "notes";
 export type ListingSortMode = "default" | "rating";
+export type BrowseCursorKey = `${ListingViewMode}:${ListingSortMode}`;
 
-export interface BrowseCursor {
+export interface StoredBrowseCursor {
   listingId: ListingId;
-  view: ListingViewMode;
 }
+
+export interface BrowseCursor extends StoredBrowseCursor {
+  position: number | null;
+}
+
+export type StoredBrowseCursors = Partial<
+  Record<BrowseCursorKey, StoredBrowseCursor>
+>;
+export type BrowseCursors = Partial<Record<BrowseCursorKey, BrowseCursor>>;
 
 export interface ListingSummary {
   id: ListingId;
@@ -34,7 +43,7 @@ export interface WellceeStorageData {
   wellceeOpenListingsInNewTab: boolean;
   wellceeListingsViewMode: ListingViewMode;
   wellceeListingsSortMode: ListingSortMode;
-  wellceeListingsBrowseCursor: BrowseCursor | null;
+  wellceeListingsBrowseCursor: StoredBrowseCursors;
 }
 
 export interface ImportedBackupData {

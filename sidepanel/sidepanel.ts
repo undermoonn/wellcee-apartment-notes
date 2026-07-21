@@ -26,6 +26,12 @@ import {
   setStoredData
 } from "../src/storage.js";
 import {
+  BROWSE_CURSOR_KEYS,
+  browseCursorKey,
+  findBrowseCursorIndex,
+  getBrowseCursor
+} from "../src/browse-cursor.js";
+import {
   checkForUpdates,
   createCheckingUpdateState,
   createInitialUpdateState,
@@ -41,10 +47,11 @@ import type {
   ViewMode
 } from "./view.js";
 import type {
-  BrowseCursor,
+  BrowseCursors,
   ImportSummary,
   ListingId,
   ListingSummary,
+  StoredBrowseCursors,
   WellceeStorageData
 } from "../src/types.js";
 
@@ -61,7 +68,7 @@ let statusTimer: number | undefined;
 let activeTabId: number | null = null;
 let activeListingId: ListingId | null = null;
 let activeListingRequest = 0;
-let browseCursor: BrowseCursor | null = null;
+let browseCursors: BrowseCursors = {};
 let dataRequest = 0;
 let updateRequest = 0;
 let uiStateRestored = false;
@@ -83,20 +90,52 @@ function normalizedSortMode(value: unknown): SortMode {
   return value === "rating" ? "rating" : "default";
 }
 
-function normalizedBrowseCursor(value: unknown): BrowseCursor | null {
-  if (
-    !isPlainRecord(value) ||
-    typeof value.listingId !== "string" ||
-    !/^\d+$/.test(value.listingId) ||
-    (value.view !== "favorites" && value.view !== "notes")
-  ) {
-    return null;
+function normalizedStoredBrowseCursors(value: unknown): StoredBrowseCursors {
+  if (!isPlainRecord(value)) {
+    return {};
   }
 
-  return {
-    listingId: value.listingId,
-    view: value.view
-  };
+  const cursors: StoredBrowseCursors = {};
+  for (const key of BROWSE_CURSOR_KEYS) {
+    const cursor = value[key];
+    if (
+      isPlainRecord(cursor) &&
+      typeof cursor.listingId === "string" &&
+      /^\d+$/.test(cursor.listingId)
+    ) {
+      cursors[key] = { listingId: cursor.listingId };
+    }
+  }
+  return cursors;
+}
+
+function mergeStoredBrowseCursors(
+  storedCursors: StoredBrowseCursors
+): BrowseCursors {
+  const nextCursors: BrowseCursors = {};
+  for (const key of BROWSE_CURSOR_KEYS) {
+    const storedCursor = storedCursors[key];
+    if (!storedCursor) {
+      continue;
+    }
+    const currentCursor = browseCursors[key];
+    nextCursors[key] =
+      currentCursor?.listingId === storedCursor.listingId
+        ? currentCursor
+        : { listingId: storedCursor.listingId, position: null };
+  }
+  return nextCursors;
+}
+
+function storedBrowseCursors(cursors: BrowseCursors): StoredBrowseCursors {
+  const storedCursors: StoredBrowseCursors = {};
+  for (const key of BROWSE_CURSOR_KEYS) {
+    const cursor = cursors[key];
+    if (cursor) {
+      storedCursors[key] = { listingId: cursor.listingId };
+    }
+  }
+  return storedCursors;
 }
 
 async function persistUiState(
@@ -110,6 +149,46 @@ async function persistUiState(
   }
 }
 
+function persistBrowseCursors(
+  cursors: BrowseCursors = browseCursors
+): Promise<void> {
+  return persistUiState({
+    [BROWSE_CURSOR_KEY]: storedBrowseCursors(cursors)
+  });
+}
+
+function listingIdsForView(view: ViewMode): ListingId[] {
+  const panelId = view === "favorites" ? "favorite-panel" : "note-panel";
+  const panel = appRoot.querySelector<HTMLElement>(`#${panelId}`);
+  if (!panel) {
+    return [];
+  }
+
+  return Array.from(
+    panel.querySelectorAll<HTMLElement>(".favorite-item"),
+    (item) => item.dataset.listingId
+  ).filter((listingId): listingId is ListingId => listingId !== undefined);
+}
+
+function syncBrowseCursorPositions(): boolean {
+  let changed = false;
+  let nextCursors = browseCursors;
+  for (const view of ["favorites", "notes"] as const) {
+    const key = browseCursorKey(view, sortMode);
+    const cursor = browseCursors[key] ?? null;
+    const position = findBrowseCursorIndex(cursor, listingIdsForView(view));
+    if (cursor && position !== null && position !== cursor.position) {
+      nextCursors = {
+        ...nextCursors,
+        [key]: { listingId: cursor.listingId, position }
+      };
+      changed = true;
+    }
+  }
+  browseCursors = nextCursors;
+  return changed;
+}
+
 async function refreshData(): Promise<void> {
   const request = ++dataRequest;
   const result = await getStoredData();
@@ -121,13 +200,19 @@ async function refreshData(): Promise<void> {
   if (!uiStateRestored) {
     viewMode = normalizedViewMode(result[VIEW_MODE_KEY]);
     sortMode = normalizedSortMode(result[SORT_MODE_KEY]);
-    browseCursor = normalizedBrowseCursor(result[BROWSE_CURSOR_KEY]);
+    browseCursors = mergeStoredBrowseCursors(
+      normalizedStoredBrowseCursors(result[BROWSE_CURSOR_KEY])
+    );
     uiStateRestored = true;
   }
   renderApp();
+  if (syncBrowseCursorPositions()) {
+    renderApp();
+  }
+  const currentCursor = getBrowseCursor(browseCursors, viewMode, sortMode);
   if (
     activeListingId !== null &&
-    browseCursor?.listingId !== activeListingId
+    currentCursor?.listingId !== activeListingId
   ) {
     void rememberBrowseCursor(activeListingId);
     renderApp();
@@ -135,21 +220,16 @@ async function refreshData(): Promise<void> {
 }
 
 function rememberBrowseCursor(listingId: ListingId): Promise<void> {
-  const panelId = viewMode === "favorites" ? "favorite-panel" : "note-panel";
-  const panel = appRoot.querySelector<HTMLElement>(`#${panelId}`);
-  if (!panel) {
-    return Promise.resolve();
-  }
-
-  const items = Array.from(
-    panel.querySelectorAll<HTMLElement>(".favorite-item")
+  const position = findBrowseCursorIndex(
+    { listingId, position: null },
+    listingIdsForView(viewMode)
   );
-  const containsListing = items.some(
-    (item) => item.dataset.listingId === listingId
-  );
-  if (containsListing) {
-    browseCursor = { listingId, view: viewMode };
-    return persistUiState({ [BROWSE_CURSOR_KEY]: browseCursor });
+  if (position !== null) {
+    browseCursors = {
+      ...browseCursors,
+      [browseCursorKey(viewMode, sortMode)]: { listingId, position }
+    };
+    return persistBrowseCursors();
   }
   return Promise.resolve();
 }
@@ -189,8 +269,11 @@ function restoreActiveScrollPosition(): void {
     return;
   }
 
-  const cursorListingId =
-    browseCursor?.view === viewMode ? browseCursor.listingId : null;
+  const cursorListingId = getBrowseCursor(
+    browseCursors,
+    viewMode,
+    sortMode
+  )?.listingId;
   const listingIds = [activeListingId, cursorListingId].filter(
     (listingId): listingId is ListingId =>
       listingId !== null && listingId !== undefined
@@ -247,9 +330,10 @@ async function refreshActiveListing(): Promise<void> {
   }
 
   if (request === activeListingRequest) {
+    const currentCursor = getBrowseCursor(browseCursors, viewMode, sortMode);
     if (
       nextListingId !== null &&
-      browseCursor?.listingId !== nextListingId
+      currentCursor?.listingId !== nextListingId
     ) {
       void rememberBrowseCursor(nextListingId);
     }
@@ -263,7 +347,7 @@ async function openListing(
   listingId: ListingId,
   url: string
 ): Promise<void> {
-  const previousBrowseCursor = browseCursor;
+  const previousBrowseCursors = browseCursors;
   const cursorPersistence = rememberBrowseCursor(listingId);
   renderApp();
   try {
@@ -282,8 +366,8 @@ async function openListing(
     }
   } catch (error) {
     console.warn("[Wellcee Notes] 无法打开房源", error);
-    browseCursor = previousBrowseCursor;
-    void persistUiState({ [BROWSE_CURSOR_KEY]: browseCursor });
+    browseCursors = previousBrowseCursors;
+    void persistBrowseCursors(previousBrowseCursors);
     setDataStatus("无法打开房源，请重试", "error");
   }
 }
@@ -488,6 +572,9 @@ function selectView(view: ViewMode): void {
 function selectSortMode(mode: SortMode): void {
   sortMode = mode === "rating" ? "rating" : "default";
   renderApp();
+  if (syncBrowseCursorPositions()) {
+    renderApp();
+  }
   void persistUiState({ [SORT_MODE_KEY]: sortMode });
 }
 
@@ -554,7 +641,7 @@ function renderApp(): void {
     sidePanelTemplate(
       {
         activeListingId,
-        browseCursor,
+        browseCursors,
         busyListings,
         dataActionsBusy,
         dataStatus,
@@ -587,12 +674,18 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (changes[SORT_MODE_KEY]) {
     sortMode = normalizedSortMode(changes[SORT_MODE_KEY].newValue);
     renderApp();
+    if (syncBrowseCursorPositions()) {
+      renderApp();
+    }
   }
   if (changes[BROWSE_CURSOR_KEY]) {
-    browseCursor = normalizedBrowseCursor(
-      changes[BROWSE_CURSOR_KEY].newValue
+    browseCursors = mergeStoredBrowseCursors(
+      normalizedStoredBrowseCursors(changes[BROWSE_CURSOR_KEY].newValue)
     );
     renderApp();
+    if (syncBrowseCursorPositions()) {
+      renderApp();
+    }
   }
   if (
     changes[FAVORITES_KEY] ||

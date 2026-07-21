@@ -19,7 +19,7 @@ export function createStorageDefaults(): WellceeStorageData {
     [OPEN_IN_NEW_TAB_KEY]: true,
     [VIEW_MODE_KEY]: "favorites",
     [SORT_MODE_KEY]: "default",
-    [BROWSE_CURSOR_KEY]: null
+    [BROWSE_CURSOR_KEY]: {}
   };
 }
 
