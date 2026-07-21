@@ -88,8 +88,6 @@ function normalizedBrowseCursor(value: unknown): BrowseCursor | null {
     !isPlainRecord(value) ||
     typeof value.listingId !== "string" ||
     !/^\d+$/.test(value.listingId) ||
-    !Number.isInteger(value.position) ||
-    Number(value.position) < 0 ||
     (value.view !== "favorites" && value.view !== "notes")
   ) {
     return null;
@@ -97,7 +95,6 @@ function normalizedBrowseCursor(value: unknown): BrowseCursor | null {
 
   return {
     listingId: value.listingId,
-    position: Number(value.position),
     view: value.view
   };
 }
@@ -147,11 +144,11 @@ function rememberBrowseCursor(listingId: ListingId): Promise<void> {
   const items = Array.from(
     panel.querySelectorAll<HTMLElement>(".favorite-item")
   );
-  const position = items.findIndex(
+  const containsListing = items.some(
     (item) => item.dataset.listingId === listingId
   );
-  if (position >= 0) {
-    browseCursor = { listingId, position, view: viewMode };
+  if (containsListing) {
+    browseCursor = { listingId, view: viewMode };
     return persistUiState({ [BROWSE_CURSOR_KEY]: browseCursor });
   }
   return Promise.resolve();
@@ -192,7 +189,9 @@ function restoreActiveScrollPosition(): void {
     return;
   }
 
-  const listingIds = [activeListingId, browseCursor?.listingId].filter(
+  const cursorListingId =
+    browseCursor?.view === viewMode ? browseCursor.listingId : null;
+  const listingIds = [activeListingId, cursorListingId].filter(
     (listingId): listingId is ListingId =>
       listingId !== null && listingId !== undefined
   );

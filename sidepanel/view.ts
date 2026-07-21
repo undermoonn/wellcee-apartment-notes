@@ -1,4 +1,5 @@
 import { html, nothing } from "lit-html";
+import { findBrowseCursorIndex } from "../src/browse-cursor.js";
 import {
   FAVORITES_KEY,
   NOTES_KEY,
@@ -261,20 +262,20 @@ export function sidePanelTemplate(
     getViewModel(state);
   const showFavorites = state.viewMode === "favorites";
   const sortByRating = state.sortMode === "rating";
-  const favoriteCursorPosition =
-    state.browseCursor?.view === "favorites"
-      ? state.browseCursor.position
-      : null;
-  const noteCursorPosition =
-    state.browseCursor?.view === "notes" ? state.browseCursor.position : null;
+  const favoriteCursorPosition = findBrowseCursorIndex(
+    state.browseCursor,
+    "favorites",
+    favorites.map((favorite) => String(favorite.id))
+  );
+  const noteCursorPosition = findBrowseCursorIndex(
+    state.browseCursor,
+    "notes",
+    noteEntries.map(([listingId]) => listingId)
+  );
   const favoriteBoundaryIndex =
-    favoriteCursorPosition === null || favorites.length === 0
-      ? -1
-      : Math.min(favoriteCursorPosition - 1, favorites.length - 1);
+    favoriteCursorPosition === null ? -1 : favoriteCursorPosition - 1;
   const noteBoundaryIndex =
-    noteCursorPosition === null || noteEntries.length === 0
-      ? -1
-      : Math.min(noteCursorPosition - 1, noteEntries.length - 1);
+    noteCursorPosition === null ? -1 : noteCursorPosition - 1;
 
   return html`
     <header class="header">

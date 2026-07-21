@@ -4,7 +4,6 @@ export type ListingSortMode = "default" | "rating";
 
 export interface BrowseCursor {
   listingId: ListingId;
-  position: number;
   view: ListingViewMode;
 }
 
